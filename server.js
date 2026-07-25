@@ -200,11 +200,11 @@ const server = http.createServer((req, res) => {
   res.writeHead(404); res.end('Not Found');
 });
 
-const PORT = 3000;
+const PORT = 8000;
 server.listen(PORT, '0.0.0.0', () => {
   console.log('');
   console.log('✅ ===== SPORT CLUB SERVER =====');
-  console.log(`🌐 Link chia sẻ Zalo: http://172.17.240.227:${PORT}`);
+  console.log(`🌐 Link chia sẻ Zalo: http://172.17.240.160:${PORT}`);
   console.log(`💻 Máy bạn:          http://localhost:${PORT}`);
   console.log('📁 Dữ liệu lưu tại:  registrations.json');
   console.log('🖼️  Ảnh lưu tại:      uploads/');
