@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>⚽ Sport Club – Vĩnh Hoàn</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',Arial,sans-serif;background:linear-gradient(135deg,#050d1a 0%,#0a1f3d 50%,#0d2b4e 100%);min-height:100vh;color:#fff;overflow-x:hidden}
+:root{--gold:#FFD700;--orange:#FF6B00;--card:rgba(255,255,255,0.06);--border:rgba(255,255,255,0.1)}
+.particles{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;overflow:hidden}
+.particle{position:absolute;animation:floatUp linear infinite;opacity:0;font-size:20px}
+@keyframes floatUp{0%{transform:translateY(100vh) rotate(0deg);opacity:0}10%{opacity:.12}90%{opacity:.12}100%{transform:translateY(-100px) rotate(720deg);opacity:0}}
+.wrap{max-width:1000px;margin:0 auto;padding:16px;position:relative;z-index:1}
+.hero{border-radius:20px;overflow:hidden;margin-bottom:20px;position:relative;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.hero img{width:100%;height:300px;object-fit:cover;object-position:center top;filter:brightness(.75);display:block}
+.hero-overlay{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.1) 0%,rgba(0,0,0,.85) 100%);display:flex;align-items:flex-end;padding:24px 28px}
+.hero h1{font-size:1.8em;font-weight:900;text-transform:uppercase;letter-spacing:2px;background:linear-gradient(90deg,#FFD700,#FFA500,#FF6B00);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero p{color:#ccc;font-size:.9em;margin-top:4px}
+.hero-live{position:absolute;top:16px;right:16px;background:rgba(255,71,87,.9);padding:6px 14px;border-radius:20px;font-size:.78em;font-weight:700;letter-spacing:1px;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+.tabs{display:flex;gap:4px;margin-bottom:18px;background:rgba(0,0,0,.3);border-radius:14px;padding:6px;overflow-x:auto}
+.tab-btn{flex:1;min-width:90px;padding:11px 8px;border:none;border-radius:10px;font-size:.82em;font-weight:700;cursor:pointer;transition:all .3s;color:rgba(255,255,255,.5);background:transparent;white-space:nowrap}
+.tab-btn.active{background:linear-gradient(135deg,#FFD700,#FF6B00);color:#050d1a;box-shadow:0 4px 18px rgba(255,165,0,.4)}
+.card{background:var(--card);backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:18px;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.3);margin-bottom:18px}
+.sec-title{font-size:1.1em;font-weight:800;margin-bottom:20px;display:flex;align-items:center;gap:8px;text-transform:uppercase;letter-spacing:1px;background:linear-gradient(90deg,#FFD700,#FFA500);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.fg{display:flex;flex-direction:column;gap:6px}
+.fg.full{grid-column:1/-1}
+label{font-size:.78em;font-weight:700;color:rgba(255,255,255,.6);letter-spacing:.5px;text-transform:uppercase}
+input,select,textarea{padding:12px 14px;background:rgba(255,255,255,.07);border:1.5px solid rgba(255,255,255,.12);border-radius:10px;color:#fff;font-size:.93em;transition:all .3s;outline:none;font-family:inherit}
+input:focus,select:focus,textarea:focus{border-color:var(--gold);background:rgba(255,215,0,.06);box-shadow:0 0 18px rgba(255,215,0,.12)}
+select option{background:#0a1f3d;color:#fff}
+input::placeholder,textarea::placeholder{color:rgba(255,255,255,.3)}
+input[type=range]{padding:4px 0;cursor:pointer;accent-color:var(--gold)}
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;text-align:center}
+.stat-num{font-size:1.8em;font-weight:900;background:linear-gradient(90deg,#FFD700,#FFA500);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.stat-lbl{font-size:.72em;color:rgba(255,255,255,.5);margin-top:3px;text-transform:uppercase;letter-spacing:.5px}
+.btn{padding:13px 22px;border:none;border-radius:10px;font-weight:700;cursor:pointer;transition:all .3s;font-size:.9em;letter-spacing:.5px}
+.btn-gold{background:linear-gradient(135deg,#FFD700,#FF6B00);color:#050d1a;box-shadow:0 4px 18px rgba(255,165,0,.3)}
+.btn-gold:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(255,165,0,.5)}
+.btn-outline{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.8)}
+.btn-green{background:rgba(46,213,115,.15);border:1px solid rgba(46,213,115,.3);color:#2ed573}
+.btn-red{background:rgba(255,71,87,.15);border:1px solid rgba(255,71,87,.3);color:#ff4757}
+.btn-submit{width:100%;padding:15px;margin-top:20px;font-size:1em;text-transform:uppercase}
+.tbl-wrap{overflow-x:auto;border-radius:12px}
+table{width:100%;border-collapse:collapse;font-size:.83em}
+th{background:rgba(255,215,0,.1);padding:11px 12px;text-align:left;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.5px;font-size:.75em;white-space:nowrap}
+td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.05);vertical-align:middle}
+tr:hover td{background:rgba(255,255,255,.03)}
+.badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:.75em;font-weight:700}
+.bg{background:rgba(46,213,115,.15);color:#2ed573;border:1px solid rgba(46,213,115,.25)}
+.bb{background:rgba(100,150,255,.15);color:#6496ff;border:1px solid rgba(100,150,255,.25)}
+.bo{background:rgba(255,165,0,.15);color:#FFA500;border:1px solid rgba(255,165,0,.25)}
+.br{background:rgba(255,71,87,.15);color:#ff4757;border:1px solid rgba(255,71,87,.25)}
+.no-data{text-align:center;padding:40px;color:rgba(255,255,255,.3);font-style:italic}
+.quarter-tabs{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
+.qtab{padding:8px 18px;border:1.5px solid rgba(255,255,255,.12);border-radius:20px;background:transparent;color:rgba(255,255,255,.6);font-weight:700;cursor:pointer;transition:all .3s;font-size:.85em}
+.qtab.active{background:linear-gradient(135deg,#FFD700,#FF6B00);color:#050d1a;border-color:transparent}
+.photo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px}
+.photo-card{border-radius:12px;overflow:hidden;position:relative;background:rgba(255,255,255,.05);border:1px solid var(--border);aspect-ratio:4/3}
+.photo-card img{width:100%;height:100%;object-fit:cover;transition:transform .3s}
+.photo-card:hover img{transform:scale(1.05)}
+.photo-caption{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(to top,rgba(0,0,0,.85),transparent);padding:10px 10px 8px;font-size:.78em;color:#ddd}
+.photo-del{position:absolute;top:6px;right:6px;background:rgba(255,71,87,.85);border:none;color:#fff;border-radius:6px;width:26px;height:26px;cursor:pointer;font-size:.9em;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .2s}
+.photo-card:hover .photo-del{opacity:1}
+.upload-zone{border:2px dashed rgba(255,215,0,.3);border-radius:14px;padding:30px;text-align:center;cursor:pointer;transition:all .3s;margin-top:14px}
+.upload-zone:hover{border-color:var(--gold);background:rgba(255,215,0,.04)}
+.upload-zone input{display:none}
+.analysis-card{background:linear-gradient(135deg,rgba(21,101,192,.15),rgba(13,71,161,.1));border:1px solid rgba(21,101,192,.3);border-radius:14px;padding:20px;margin-top:14px}
+.meter-row{display:flex;flex-direction:column;gap:10px;margin:14px 0}
+.meter-item label{font-size:.78em;color:rgba(255,255,255,.6);display:flex;justify-content:space-between;margin-bottom:4px}
+.meter-bar{height:8px;background:rgba(255,255,255,.08);border-radius:10px;overflow:hidden}
+.meter-fill{height:100%;border-radius:10px;transition:width 1s ease}
+.ai-text{background:rgba(0,0,0,.2);border-radius:10px;padding:14px;margin-top:14px;font-size:.87em;line-height:1.7;color:#cdd;border-left:3px solid var(--gold)}
+.ai-loading{text-align:center;padding:30px;color:rgba(255,255,255,.5)}
+.spinner{display:inline-block;width:36px;height:36px;border:3px solid rgba(255,215,0,.2);border-top-color:var(--gold);border-radius:50%;animation:spin 1s linear infinite;margin-bottom:10px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.toast{position:fixed;top:20px;right:20px;z-index:9999;padding:14px 22px;border-radius:12px;font-weight:700;transform:translateX(200%);transition:transform .4s ease;box-shadow:0 8px 30px rgba(0,0,0,.4);max-width:300px;font-size:.9em}
+.toast.show{transform:translateX(0)}
+.toast.success{background:linear-gradient(135deg,#2ed573,#1abc9c);color:#fff}
+.toast.error{background:linear-gradient(135deg,#ff4757,#c0392b);color:#fff}
+.tab-content{display:none}
+.tab-content.active{display:block}
+@media(max-width:600px){.form-grid{grid-template-columns:1fr}.stats-row{grid-template-columns:1fr 1fr}.photo-grid{grid-template-columns:1fr 1fr}.hero img{height:200px}.hero h1{font-size:1.3em}}
+</style>
+</head>
+<body>
+<div class="particles" id="particles"></div>
+<div class="wrap">
+  <div class="hero">
+    <img src="/uploads/team.jpg" alt="Sport Club" onerror="this.style.height='120px';this.style.background='linear-gradient(135deg,#1a3a6e,#0d2b4e)'"/>
+    <div class="hero-overlay">
+      <div>
+        <div class="hero h1" style="font-size:1.8em;font-weight:900;text-transform:uppercase;letter-spacing:2px;background:linear-gradient(90deg,#FFD700,#FFA500,#FF6B00);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">⚽ CLB Bóng Đá Vĩnh Hoàn</div>
+        <p>🏆 Giải S7 – Tranh Cup Các CLB Bóng Đá Vĩnh Hoàn • 27/12/1997 – 27/12/2025</p>
+      </div>
+    </div>
+    <div class="hero-live">🔴 LIVE</div>
+  </div>
+
+  <div class="stats-row" id="statsRow">
+    <div class="stat-card"><div class="stat-num" id="sTotal">0</div><div class="stat-lbl">Đã đăng ký</div></div>
+    <div class="stat-card"><div class="stat-num" id="sPos">0</div><div class="stat-lbl">Có vị trí</div></div>
+    <div class="stat-card"><div class="stat-num" id="sPhotos">0</div><div class="stat-lbl">Ảnh sinh hoạt</div></div>
+    <div class="stat-card"><div class="stat-num" id="sSize">--</div><div class="stat-lbl">Size phổ biến</div></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('register')">📝 Đăng Ký</button>
+    <button class="tab-btn" onclick="switchTab('list')">📋 Danh Sách</button>
+    <button class="tab-btn" onclick="switchTab('export')">📤 Xuất Data</button>
+    <button class="tab-btn" onclick="switchTab('gallery')">📸 Hình Ảnh</button>
+    <button class="tab-btn" onclick="switchTab('analysis')">🤖 Phân Tích AI</button>
+  </div>
+
+  <!-- ĐĂNG KÝ -->
+  <div id="tab-register" class="tab-content active">
+    <div class="card">
+      <div class="sec-title">⚽ Thông Tin Đăng Ký</div>
+      <form id="regForm">
+        <div class="form-grid">
+          <div class="fg"><label>👤 Họ và Tên *</label><input type="text" id="fullName" placeholder="Nhập họ và tên..." required/></div>
+          <div class="fg"><label>📞 Số Điện Thoại *</label><input type="tel" id="phone" placeholder="0912 345 678" required/></div>
+          <div class="fg"><label>🏷️ Số Áo *</label><input type="number" id="jerseyNumber" placeholder="VD: 10" min="1" max="99" required/></div>
+          <div class="fg"><label>📏 Size Áo *</label>
+            <select id="jerseySize" required><option value="">-- Chọn size --</option><option>XS</option><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option><option>XXXL</option></select>
+          </div>
+          <div class="fg"><label>⚽ Vị Trí</label>
+            <select id="position"><option value="">-- Chọn vị trí --</option><option>Thủ môn</option><option>Hậu vệ</option><option>Tiền vệ</option><option>Tiền đạo</option><option>Linh hoạt</option></select>
+          </div>
+          <div class="fg"><label>🏥 Sức Khỏe</label>
+            <select id="health"><option>Tốt</option><option>Bình thường</option><option>Có chấn thương nhẹ</option></select>
+          </div>
+          <div class="fg"><label>📐 Chiều Cao (cm)</label><input type="number" id="height" placeholder="VD: 172" min="140" max="210"/></div>
+          <div class="fg"><label>⚖️ Cân Nặng (kg)</label><input type="number" id="weight" placeholder="VD: 68" min="40" max="120"/></div>
+          <div class="fg full"><label>⚡ Tốc Độ (1–10) <span id="vSpeed">5</span>/10</label><input type="range" id="speed" min="1" max="10" value="5" oninput="document.getElementById('vSpeed').textContent=this.value"/></div>
+          <div class="fg full"><label>🫀 Sức Bền (1–10) <span id="vStamina">5</span>/10</label><input type="range" id="stamina" min="1" max="10" value="5" oninput="document.getElementById('vStamina').textContent=this.value"/></div>
+          <div class="fg full"><label>🎯 Kỹ Thuật (1–10) <span id="vTechnique">5</span>/10</label><input type="range" id="technique" min="1" max="10" value="5" oninput="document.getElementById('vTechnique').textContent=this.value"/></div>
+          <div class="fg full"><label>🧠 Chiến Thuật (1–10) <span id="vTactic">5</span>/10</label><input type="range" id="tactic" min="1" max="10" value="5" oninput="document.getElementById('vTactic').textContent=this.value"/></div>
+          <div class="fg full"><label>💪 Thể Lực (1–10) <span id="vPhysical">5</span>/10</label><input type="range" id="physical" min="1" max="10" value="5" oninput="document.getElementById('vPhysical').textContent=this.value"/></div>
+          <div class="fg"><label>🍽️ Chế Độ Ăn</label><select id="diet"><option>Bình thường</option><option>Ăn chay</option><option>Không ăn hải sản</option><option>Khác</option></select></div>
+          <div class="fg"><label>🚗 Phương Tiện</label><select id="transport"><option>Xe máy</option><option>Ô tô</option><option>Cần đưa đón</option></select></div>
+          <div class="fg full"><label>📝 Ghi Chú</label><textarea id="notes" rows="2" placeholder="Thông tin thêm..."></textarea></div>
+        </div>
+        <button type="submit" class="btn btn-gold btn-submit">⚽ XÁC NHẬN ĐĂNG KÝ</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- DANH SÁCH -->
+  <div id="tab-list" class="tab-content">
+    <div class="card">
+      <div class="sec-title">📋 Danh Sách Cầu Thủ</div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Họ Tên</th><th>SĐT</th><th>Số Áo</th><th>Size</th><th>Vị Trí</th><th>Sức Khỏe</th><th>Cao</th><th>Nặng</th><th>Xóa</th></tr></thead>
+          <tbody id="tableBody"><tr><td colspan="10" class="no-data">⏳ Đang tải...</td></tr></tbody>
+        </table>
+      </div>
+      <div style="margin-top:14px;text-align:right"><button class="btn btn-outline" onclick="loadList()">🔄 Tải Lại</button></div>
+    </div>
+  </div>
+
+  <!-- XUẤT DỮ LIỆU -->
+  <div id="tab-export" class="tab-content">
+    <div class="card">
+      <div class="sec-title">📤 Xuất Dữ Liệu</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px">
+        <div class="card" style="text-align:center;padding:28px">
+          <div style="font-size:3em;margin-bottom:10px">📊</div>
+          <div style="font-weight:800;font-size:1.1em;color:var(--gold);margin-bottom:6px">Excel (.xls)</div>
+          <div style="color:rgba(255,255,255,.5);font-size:.82em;margin-bottom:16px">Mở bằng Microsoft Excel</div>
+          <button class="btn btn-green" onclick="window.open('/api/export/xlsx')" style="width:100%">⬇️ Tải Excel</button>
+        </div>
+        <div class="card" style="text-align:center;padding:28px">
+          <div style="font-size:3em;margin-bottom:10px">📄</div>
+          <div style="font-weight:800;font-size:1.1em;color:var(--gold);margin-bottom:6px">CSV (.csv)</div>
+          <div style="color:rgba(255,255,255,.5);font-size:.82em;margin-bottom:16px">Dùng với mọi bảng tính</div>
+          <button class="btn btn-outline" onclick="window.open('/api/export/csv')" style="width:100%">⬇️ Tải CSV</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="sec-title">👁️ Xem Trước</div>
+        <div id="previewTable"><div class="no-data">Nhấn nút bên dưới để xem trước</div></div>
+        <button class="btn btn-outline" onclick="loadPreview()" style="margin-top:12px">🔍 Xem Trước Dữ Liệu</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- HÌNH ẢNH -->
+  <div id="tab-gallery" class="tab-content">
+    <div class="card">
+      <div class="sec-title">📤 Đăng Tải Hình Ảnh</div>
+      <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+        <div class="fg"><label>📅 Quý</label><select id="uploadQuarter"><option value="Q1">Quý 1 (T1–T3)</option><option value="Q2">Quý 2 (T4–T6)</option><option value="Q3">Quý 3 (T7–T9)</option><option value="Q4">Quý 4 (T10–T12)</option></select></div>
+        <div class="fg"><label>📝 Chú Thích</label><input type="text" id="uploadCaption" placeholder="Mô tả ảnh..."/></div>
+      </div>
+      <label class="upload-zone" for="photoInput">
+        <input type="file" id="photoInput" accept="image/*" multiple/>
+        <div style="font-size:2.5em;margin-bottom:8px">📸</div>
+        <div style="font-weight:700;color:var(--gold)">Nhấn để chọn ảnh</div>
+        <div style="font-size:.8em;color:rgba(255,255,255,.4);margin-top:4px">JPG, PNG, GIF, WebP</div>
+      </label>
+      <button class="btn btn-gold" style="margin-top:12px;width:100%" onclick="uploadPhotos()">📤 TẢI ẢNH LÊN</button>
+    </div>
+    <div class="card">
+      <div class="sec-title">🖼️ Thư Viện Ảnh Sinh Hoạt</div>
+      <div class="quarter-tabs">
+        <button class="qtab active" onclick="filterQuarter('ALL',this)">🌟 Tất Cả</button>
+        <button class="qtab" onclick="filterQuarter('Q1',this)">Q1</button>
+        <button class="qtab" onclick="filterQuarter('Q2',this)">Q2</button>
+        <button class="qtab" onclick="filterQuarter('Q3',this)">Q3</button>
+        <button class="qtab" onclick="filterQuarter('Q4',this)">Q4</button>
+      </div>
+      <div class="photo-grid" id="photoGrid"><div class="no-data" style="grid-column:1/-1">⏳ Đang tải...</div></div>
+    </div>
+  </div>
+
+  <!-- PHÂN TÍCH AI -->
+  <div id="tab-analysis" class="tab-content">
+    <div class="card">
+      <div class="sec-title">🤖 Phân Tích Thể Trạng Cầu Thủ</div>
+      <div style="display:flex;gap:10px;margin-bottom:18px;align-items:center">
+        <select id="playerSelect" style="flex:1"><option value="">-- Chọn cầu thủ --</option></select>
+        <button class="btn btn-gold" onclick="analyzePlayer()">🔍 Phân Tích AI</button>
+      </div>
+      <div id="analysisResult"><div class="no-data">👆 Chọn cầu thủ và nhấn Phân Tích AI</div></div>
+    </div>
+    <div class="card" id="teamOverview" style="display:none">
+      <div class="sec-title">📊 Tổng Quan Đội</div>
+      <div id="teamStats"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = window.location.origin;
+let allPhotos = [], currentQuarter = 'ALL';
+
+// Particles
+const pc = document.getElementById('particles');
+['⚽','🏆','🥇','⭐','🎯','🔥','🏅','⚡'].forEach(e=>{
+  for(let i=0;i<3;i++){
+    const p=document.createElement('div');p.className='particle';
+    p.style.cssText=`left:${Math.random()*100}%;font-size:${Math.random()*22+12}px;animation-duration:${Math.random()*18+10}s;animation-delay:${Math.random()*12}s`;
+    p.textContent=e;pc.appendChild(p);
+  }
+});
+
+function switchTab(tab){
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',['register','list','export','gallery','analysis'][i]===tab));
+  document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
+  document.getElementById('tab-'+tab).classList.add('active');
+  if(tab==='list') loadList();
+  if(tab==='gallery'){loadPhotos();loadStats();}
+  if(tab==='export') loadPreview();
+  if(tab==='analysis') loadPlayerSelect();
+}
+
+function toast(msg,type='success'){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.className='toast '+type;
+  setTimeout(()=>t.classList.add('show'),10);
+  setTimeout(()=>t.classList.remove('show'),3500);
+}
+
+document.getElementById('regForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const btn=e.target.querySelector('.btn-submit');
+  btn.disabled=true;btn.textContent='⏳ Đang xử lý...';
+  const d={
+    fullName:document.getElementById('fullName').value.trim(),
+    phone:document.getElementById('phone').value.trim(),
+    jerseyNumber:document.getElementById('jerseyNumber').value,
+    jerseySize:document.getElementById('jerseySize').value,
+    position:document.getElementById('position').value||'Chưa chọn',
+    health:document.getElementById('health').value,
+    height:document.getElementById('height').value,
+    weight:document.getElementById('weight').value,
+    speed:document.getElementById('speed').value,
+    stamina:document.getElementById('stamina').value,
+    technique:document.getElementById('technique').value,
+    tactic:document.getElementById('tactic').value,
+    physical:document.getElementById('physical').value,
+    diet:document.getElementById('diet').value,
+    transport:document.getElementById('transport').value,
+    notes:document.getElementById('notes').value.trim()
+  };
+  try{
+    const res=await fetch(API+'/api/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
+    const r=await res.json();
+    if(r.success){toast('✅ Đăng ký thành công!');e.target.reset();['speed','stamina','technique','tactic','physical'].forEach(id=>{document.getElementById(id).value=5;document.getElementById('v'+id.charAt(0).toUpperCase()+id.slice(1)).textContent='5'});loadStats();}
+    else toast('❌ Lỗi!','error');
+  }catch{toast('❌ Lỗi kết nối','error');}
+  btn.disabled=false;btn.textContent='⚽ XÁC NHẬN ĐĂNG KÝ';
+});
+
+async function loadStats(){
+  try{
+    const data=await(await fetch(API+'/api/registrations')).json();
+    const photos=await(await fetch(API+'/api/photos')).json();
+    document.getElementById('sTotal').textContent=data.length;
+    document.getElementById('sPos').textContent=data.filter(d=>d.position&&d.position!=='Chưa chọn').length;
+    document.getElementById('sPhotos').textContent=photos.length;
+    if(data.length){const sz={};data.forEach(d=>{if(d.jerseySize)sz[d.jerseySize]=(sz[d.jerseySize]||0)+1});const top=Object.entries(sz).sort((a,b)=>b[1]-a[1])[0];document.getElementById('sSize').textContent=top?top[0]:'--';}
+  }catch{}
+}
+
+async function loadList(){
+  try{
+    const data=await(await fetch(API+'/api/registrations')).json();
+    const pc={'Thủ môn':'bo','Hậu vệ':'bb','Tiền vệ':'bg','Tiền đạo':'br','Linh hoạt':'bb','Chưa chọn':'bo'};
+    const body=document.getElementById('tableBody');
+    if(!data.length){body.innerHTML='<tr><td colspan="10" class="no-data">Chưa có đăng ký nào</td></tr>';return;}
+    body.innerHTML=data.map((d,i)=>`<tr><td><b>${i+1}</b></td><td><b>${d.fullName||'--'}</b></td><td>${d.phone||'--'}</td><td><span class="badge bo" style="font-weight:900">#${d.jerseyNumber||'--'}</span></td><td><span class="badge bb">${d.jerseySize||'--'}</span></td><td><span class="badge ${pc[d.position]||'bb'}">${d.position||'--'}</span></td><td><span class="badge bg">${d.health||'--'}</span></td><td>${d.height?d.height+'cm':'--'}</td><td>${d.weight?d.weight+'kg':'--'}</td><td><button class="btn btn-red" style="padding:5px 10px;font-size:.75em" onclick="deleteReg(${d.id})">🗑️</button></td></tr>`).join('');
+  }catch{document.getElementById('tableBody').innerHTML='<tr><td colspan="10" class="no-data">❌ Lỗi kết nối</td></tr>';}
+}
+
+async function deleteReg(id){
+  if(!confirm('Xóa đăng ký này?')) return;
+  await fetch(API+'/api/registrations/'+id,{method:'DELETE'});
+  toast('🗑️ Đã xóa');loadList();loadStats();
+}
+
+async function loadPreview(){
+  try{
+    const data=await(await fetch(API+'/api/registrations')).json();
+    const el=document.getElementById('previewTable');
+    if(!data.length){el.innerHTML='<div class="no-data">Chưa có dữ liệu</div>';return;}
+    el.innerHTML=`<div class="tbl-wrap"><table><thead><tr><th>#</th><th>Họ Tên</th><th>SĐT</th><th>Số Áo</th><th>Size</th><th>Vị Trí</th><th>Cao</th><th>Nặng</th></tr></thead><tbody>${data.map((d,i)=>`<tr><td>${i+1}</td><td><b>${d.fullName}</b></td><td>${d.phone}</td><td>#${d.jerseyNumber}</td><td>${d.jerseySize}</td><td>${d.position}</td><td>${d.height||'--'}</td><td>${d.weight||'--'}</td></tr>`).join('')}</tbody></table></div><div style="margin-top:10px;color:rgba(255,255,255,.4);font-size:.8em">Tổng: ${data.length} cầu thủ</div>`;
+  }catch{}
+}
+
+async function loadPhotos(){
+  try{allPhotos=await(await fetch(API+'/api/photos')).json();renderPhotos();}catch{}
+}
+
+function filterQuarter(q,btn){
+  currentQuarter=q;
+  document.querySelectorAll('.qtab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');renderPhotos();
+}
+
+function renderPhotos(){
+  const filtered=currentQuarter==='ALL'?allPhotos:allPhotos.filter(p=>p.quarter===currentQuarter);
+  const grid=document.getElementById('photoGrid');
+  if(!filtered.length){grid.innerHTML='<div class="no-data" style="grid-column:1/-1">📷 Chưa có ảnh</div>';return;}
+  grid.innerHTML=filtered.map(p=>`<div class="photo-card"><img src="${API+p.url}" alt="${p.caption}" loading="lazy"/><div class="photo-caption"><span class="badge bo" style="font-size:.7em">${p.quarter}</span> ${p.caption||''}</div><button class="photo-del" onclick="deletePhoto(${p.id})">✕</button></div>`).join('');
+}
+
+async function uploadPhotos(){
+  const files=document.getElementById('photoInput').files;
+  const quarter=document.getElementById('uploadQuarter').value;
+  const caption=document.getElementById('uploadCaption').value;
+  if(!files.length){toast('⚠️ Chọn ảnh trước!','error');return;}
+  let ok=0;
+  for(const file of files){
+    const fd=new FormData();fd.append('photo',file,file.name);fd.append('quarter',quarter);fd.append('caption',caption||file.name);
+    try{const r=await(await fetch(API+'/api/photos/upload',{method:'POST',body:fd})).json();if(r.success)ok++;}catch{}
+  }
+  toast(ok>0?`✅ Đã tải ${ok} ảnh!`:'❌ Lỗi tải ảnh',ok>0?'success':'error');
+  document.getElementById('photoInput').value='';loadPhotos();loadStats();
+}
+
+async function deletePhoto(id){
+  if(!confirm('Xóa ảnh này?')) return;
+  await fetch(API+'/api/photos/'+id,{method:'DELETE'});
+  toast('🗑️ Đã xóa ảnh');loadPhotos();loadStats();
+}
+
+async function loadPlayerSelect(){
+  try{
+    const data=await(await fetch(API+'/api/registrations')).json();
+    const sel=document.getElementById('playerSelect');
+    sel.innerHTML='<option value="">-- Chọn cầu thủ --</option>'+data.map(d=>`<option value="${d.id}">${d.fullName} – #${d.jerseyNumber} ${d.position?'('+d.position+')':''}</option>`).join('');
+    if(data.length) showTeamOverview(data);
+  }catch{}
+}
+
+async function analyzePlayer(){
+  const id=document.getElementById('playerSelect').value;
+  if(!id){toast('⚠️ Chọn cầu thủ trước!','error');return;}
+  const data=await(await fetch(API+'/api/registrations')).json();
+  const player=data.find(d=>d.id==id);
+  if(!player) return;
+  const el=document.getElementById('analysisResult');
+  el.innerHTML=`<div class="ai-loading"><div class="spinner"></div><div>AI đang phân tích...</div></div>`;
+  try{
+    const prompt=`Bạn là chuyên gia phân tích thể chất cầu thủ bóng đá chuyên nghiệp. Phân tích thể trạng cho cầu thủ sau bằng tiếng Việt, ngắn gọn, dùng emoji:\n\nHọ tên: ${player.fullName}\nVị trí: ${player.position||'Chưa xác định'}\nChiều cao: ${player.height||'?'}cm | Cân nặng: ${player.weight||'?'}kg\nTốc độ: ${player.speed||5}/10 | Sức bền: ${player.stamina||5}/10 | Kỹ thuật: ${player.technique||5}/10 | Chiến thuật: ${player.tactic||5}/10 | Thể lực: ${player.physical||5}/10\nSức khỏe: ${player.health||'Tốt'}\n\nPhân tích theo mục:\n1. 💪 Điểm mạnh\n2. ⚠️ Cần cải thiện\n3. 🎯 Vai trò phù hợp\n4. 🏃 Chế độ luyện tập\n5. 🥗 Dinh dưỡng\n6. ⭐ Đánh giá tổng thể /10`;
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,messages:[{role:'user',content:prompt}]})});
+    const aiData=await res.json();
+    const aiText=aiData.content?.[0]?.text||'Không thể phân tích lúc này.';
+    let bmiHtml='';
+    if(player.height&&player.weight){const bmi=(player.weight/((player.height/100)**2)).toFixed(1);const bmiStatus=bmi<18.5?'Thiếu cân':bmi<25?'Bình thường':bmi<30?'Thừa cân':'Béo phì';const bmiColor=bmi<18.5?'#64b5f6':bmi<25?'#2ed573':bmi<30?'#FFA500':'#ff4757';bmiHtml=`<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px"><div class="stat-card" style="flex:1"><div class="stat-num">${player.height}cm</div><div class="stat-lbl">Chiều Cao</div></div><div class="stat-card" style="flex:1"><div class="stat-num">${player.weight}kg</div><div class="stat-lbl">Cân Nặng</div></div><div class="stat-card" style="flex:1"><div class="stat-num" style="color:${bmiColor}">${bmi}</div><div class="stat-lbl">BMI – ${bmiStatus}</div></div></div>`;}
+    const stats=[{l:'⚡ Tốc Độ',v:parseInt(player.speed||5)},{l:'🫀 Sức Bền',v:parseInt(player.stamina||5)},{l:'🎯 Kỹ Thuật',v:parseInt(player.technique||5)},{l:'🧠 Chiến Thuật',v:parseInt(player.tactic||5)},{l:'💪 Thể Lực',v:parseInt(player.physical||5)}];
+    el.innerHTML=`<div class="analysis-card"><h3 style="color:#64b5f6;margin-bottom:12px">📊 ${player.fullName} – #${player.jerseyNumber} <span class="badge bo">${player.position||'?'}</span></h3>${bmiHtml}<div class="meter-row">${stats.map(s=>`<div class="meter-item"><label><span>${s.l}</span><span>${s.v}/10</span></label><div class="meter-bar"><div class="meter-fill" style="width:${s.v*10}%;background:linear-gradient(90deg,#FFD700,#FF6B00)"></div></div></div>`).join('')}</div><div class="ai-text">${aiText.replace(/\n/g,'<br>')}</div></div>`;
+  }catch(err){el.innerHTML=`<div class="ai-text">❌ Không thể kết nối AI.<br><small>${err.message}</small></div>`;}
+}
+
+function showTeamOverview(data){
+  const el=document.getElementById('teamStats');document.getElementById('teamOverview').style.display='block';
+  const pos={},sz={};let tH=0,cH=0,tW=0,cW=0;
+  data.forEach(d=>{if(d.position)pos[d.position]=(pos[d.position]||0)+1;if(d.jerseySize)sz[d.jerseySize]=(sz[d.jerseySize]||0)+1;if(d.height){tH+=parseInt(d.height);cH++;}if(d.weight){tW+=parseInt(d.weight);cW++;}});
+  el.innerHTML=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px"><div class="stat-card"><div class="stat-num">${data.length}</div><div class="stat-lbl">Tổng</div></div><div class="stat-card"><div class="stat-num">${cH?(tH/cH).toFixed(0)+'cm':'--'}</div><div class="stat-lbl">Cao TB</div></div><div class="stat-card"><div class="stat-num">${cW?(tW/cW).toFixed(0)+'kg':'--'}</div><div class="stat-lbl">Nặng TB</div></div></div><div style="margin-bottom:8px"><b style="color:var(--gold);font-size:.85em">⚽ VỊ TRÍ</b></div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">${Object.entries(pos).map(([p,c])=>`<span class="badge bb">${p}: ${c}</span>`).join('')}</div><div style="margin-bottom:8px"><b style="color:var(--gold);font-size:.85em">📏 SIZE ÁO</b></div><div style="display:flex;gap:8px;flex-wrap:wrap">${Object.entries(sz).map(([s,c])=>`<span class="badge bo">${s}: ${c}</span>`).join('')}</div>`;
+}
+
+loadStats();
+</script>
+</body>
+</html>
