@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 
-const SHEET_URL = 'https://script.google.com/macros/s/AKfycbyFreCV4GIgP_ys5b8UYYtTrh69Yp1_-NYE1K8wRjlMA7dOtu8rhUZRQLwP2go9cFL3-A/exec';
+const SHEET_URL = 'https://script.google.com/macros/s/AKfycbyVZpZOuLe86d0FTRpUeR1SdcAhAYbtAFe5-B_DsxzVfAIa8BhasAPZsNnUghJY8VlDyQ/exec';
 const PHOTOS_FILE = path.join(__dirname, 'photos.json');
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
 
