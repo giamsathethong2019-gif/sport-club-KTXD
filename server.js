@@ -3,7 +3,9 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 
-const SHEET_URL = 'https://script.google.com/macros/s/AKfycbyVZpZOuLe86d0FTRpUeR1SdcAhAYbtAFe5-B_DsxzVfAIa8BhasAPZsNnUghJY8VlDyQ/exec';
+const SUPABASE_URL = 'https://lpkydkswxohqijjllaxi.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxwa3lka3N3eG9ocWlqamxsYXhpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUwOTEzMDQsImV4cCI6MjEwMDY2NzMwNH0.2Z--r5WVdqKbsR7-IwFghuI8xWgYS_Eyn3QQfjfdGjM';
+const TABLE = 'registrations';
 const PHOTOS_FILE = path.join(__dirname, 'photos.json');
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
 
@@ -15,34 +17,31 @@ function getPathname(reqUrl) {
   catch { return reqUrl.split('?')[0]; }
 }
 
-function sheetRequest(method, data) {
+function supabase(method, path2, body) {
   return new Promise((resolve, reject) => {
-    const body = data ? JSON.stringify(data) : null;
-    const urlObj = new URL(SHEET_URL);
-    const options = {
-      hostname: urlObj.hostname,
-      path: urlObj.pathname + urlObj.search,
-      method: method,
-      headers: { 'Content-Type': 'application/json' },
-      followRedirects: true
+    const data = body ? JSON.stringify(body) : null;
+    const urlObj = new URL(SUPABASE_URL + path2);
+    const headers = {
+      'apikey': SUPABASE_KEY,
+      'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'Content-Type': 'application/json',
+      'Prefer': method === 'POST' ? 'return=representation' : ''
     };
-    const req = https.request(options, (res) => {
+    if (method === 'GET') headers['Accept'] = 'application/json';
+    const req = https.request({
+      hostname: urlObj.hostname,
+      path: urlObj.pathname + (urlObj.search || ''),
+      method, headers
+    }, (res) => {
       let raw = '';
-      // follow redirect
-      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        const loc = res.headers.location;
-        https.get(loc, (r2) => {
-          let d = '';
-          r2.on('data', c => d += c);
-          r2.on('end', () => { try { resolve(JSON.parse(d)); } catch { resolve({}); } });
-        }).on('error', reject);
-        return;
-      }
       res.on('data', c => raw += c);
-      res.on('end', () => { try { resolve(JSON.parse(raw)); } catch { resolve({}); } });
+      res.on('end', () => {
+        try { resolve(JSON.parse(raw)); }
+        catch { resolve(raw); }
+      });
     });
     req.on('error', reject);
-    if (body) req.write(body);
+    if (data) req.write(data);
     req.end();
   });
 }
@@ -65,12 +64,7 @@ function parseMultipart(buffer, boundary) {
     const nameMatch = headers.match(/name="([^"]+)"/);
     const filenameMatch = headers.match(/filename="([^"]+)"/);
     const ctMatch = headers.match(/Content-Type: (.+)/);
-    parts.push({
-      name: nameMatch ? nameMatch[1] : '',
-      filename: filenameMatch ? filenameMatch[1] : null,
-      contentType: ctMatch ? ctMatch[1].trim() : 'text/plain',
-      data
-    });
+    parts.push({ name: nameMatch?nameMatch[1]:'', filename: filenameMatch?filenameMatch[1]:null, contentType: ctMatch?ctMatch[1].trim():'text/plain', data });
     start = nextB;
   }
   return parts;
@@ -78,14 +72,11 @@ function parseMultipart(buffer, boundary) {
 
 const server = http.createServer((req, res) => {
   const pathname = getPathname(req.url);
-
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
   if (req.method === 'OPTIONS') { res.writeHead(200); res.end(); return; }
 
-  // Serve index.html
   if (pathname === '/' || pathname === '/index.html') {
     fs.readFile(path.join(__dirname, 'index.html'), (err, data) => {
       if (err) { res.writeHead(404); res.end('Not Found'); return; }
@@ -95,67 +86,73 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // Serve uploads
   if (pathname.startsWith('/uploads/')) {
     const file = path.join(__dirname, pathname);
     if (!file.startsWith(UPLOADS_DIR)) { res.writeHead(403); res.end(); return; }
     fs.readFile(file, (err, data) => {
       if (err) { res.writeHead(404); res.end(); return; }
       const ext = path.extname(file).toLowerCase();
-      const mime = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.gif': 'image/gif', '.webp': 'image/webp' }[ext] || 'application/octet-stream';
+      const mime = {'.jpg':'image/jpeg','.jpeg':'image/jpeg','.png':'image/png','.gif':'image/gif','.webp':'image/webp'}[ext]||'application/octet-stream';
       res.writeHead(200, { 'Content-Type': mime });
       res.end(data);
     });
     return;
   }
 
-  // GET registrations — đọc từ Google Sheets
+  // GET registrations từ Supabase
   if (pathname === '/api/registrations' && req.method === 'GET') {
-    sheetRequest('GET').then(data => {
-      // Map Sheet columns về object
-      const result = Array.isArray(data) ? data.map((d, i) => ({
-        id: i + 1,
-        timestamp: d['Thời Gian'] || '',
-        fullName: d['Họ Tên'] || '',
-        phone: d['SĐT'] || '',
-        jerseyNumber: d['Số Áo'] || '',
-        jerseySize: d['Size'] || '',
-        position: d['Vị Trí'] || '',
-        health: d['Sức Khỏe'] || '',
-        height: d['Cao'] || '',
-        weight: d['Nặng'] || '',
-        speed: d['Tốc Độ'] || '',
-        stamina: d['Sức Bền'] || '',
-        technique: d['Kỹ Thuật'] || '',
-        tactic: d['Chiến Thuật'] || '',
-        physical: d['Thể Lực'] || '',
-        diet: d['Chế Độ Ăn'] || '',
-        transport: d['Phương Tiện'] || '',
-        notes: d['Ghi Chú'] || ''
+    supabase('GET', `/rest/v1/${TABLE}?select=*&order=created_at.asc`).then(data => {
+      const result = Array.isArray(data) ? data.map((d,i) => ({
+        id: d.id, timestamp: d.timestamp||'',
+        fullName: d.full_name||'', phone: d.phone||'',
+        jerseyNumber: d.jersey_number||'', jerseySize: d.jersey_size||'',
+        position: d.position||'', health: d.health||'',
+        height: d.height||'', weight: d.weight||'',
+        speed: d.speed||'', stamina: d.stamina||'',
+        technique: d.technique||'', tactic: d.tactic||'',
+        physical: d.physical||'', diet: d.diet||'',
+        transport: d.transport||'', notes: d.notes||''
       })) : [];
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(result));
-    }).catch(() => {
-      res.writeHead(500); res.end(JSON.stringify([]));
-    });
+    }).catch(() => { res.writeHead(200); res.end('[]'); });
     return;
   }
 
-  // POST register — ghi vào Google Sheets
+  // POST register vào Supabase
   if (pathname === '/api/register' && req.method === 'POST') {
     let body = '';
     req.on('data', c => body += c);
     req.on('end', () => {
       try {
-        const entry = JSON.parse(body);
-        sheetRequest('POST', entry).then(() => {
+        const d = JSON.parse(body);
+        const row = {
+          timestamp: new Date().toLocaleString('vi-VN'),
+          full_name: d.fullName, phone: d.phone,
+          jersey_number: d.jerseyNumber, jersey_size: d.jerseySize,
+          position: d.position, health: d.health,
+          height: d.height, weight: d.weight,
+          speed: d.speed, stamina: d.stamina,
+          technique: d.technique, tactic: d.tactic,
+          physical: d.physical, diet: d.diet,
+          transport: d.transport, notes: d.notes
+        };
+        supabase('POST', `/rest/v1/${TABLE}`, row).then(r => {
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ success: true }));
-        }).catch(() => {
-          res.writeHead(500); res.end(JSON.stringify({ success: false }));
-        });
-      } catch (e) { res.writeHead(400); res.end(JSON.stringify({ success: false })); }
+        }).catch(() => { res.writeHead(500); res.end(JSON.stringify({ success: false })); });
+      } catch(e) { res.writeHead(400); res.end(JSON.stringify({ success: false })); }
     });
+    return;
+  }
+
+  // DELETE registration
+  if (pathname.startsWith('/api/registrations/') && req.method === 'DELETE') {
+    const id = pathname.split('/').pop();
+    supabase('DELETE', `/rest/v1/${TABLE}?id=eq.${id}`).then(() => {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true }));
+    }).catch(() => { res.writeHead(500); res.end(JSON.stringify({ success: false })); });
     return;
   }
 
@@ -173,23 +170,23 @@ const server = http.createServer((req, res) => {
     req.on('end', () => {
       try {
         const buffer = Buffer.concat(chunks);
-        const ct = req.headers['content-type'] || '';
-        const boundaryMatch = ct.match(/boundary=(.+)/);
-        if (!boundaryMatch) { res.writeHead(400); res.end('No boundary'); return; }
-        const parts = parseMultipart(buffer, boundaryMatch[1]);
-        const filePart = parts.find(p => p.filename);
-        const quarter = parts.find(p => p.name === 'quarter')?.data.toString() || 'Q1';
-        const caption = parts.find(p => p.name === 'caption')?.data.toString() || '';
-        if (!filePart) { res.writeHead(400); res.end('No file'); return; }
-        const ext = path.extname(filePart.filename) || '.jpg';
+        const ct = req.headers['content-type']||'';
+        const bm = ct.match(/boundary=(.+)/);
+        if (!bm) { res.writeHead(400); res.end('No boundary'); return; }
+        const parts = parseMultipart(buffer, bm[1]);
+        const fp = parts.find(p => p.filename);
+        const quarter = parts.find(p => p.name==='quarter')?.data.toString()||'Q1';
+        const caption = parts.find(p => p.name==='caption')?.data.toString()||'';
+        if (!fp) { res.writeHead(400); res.end('No file'); return; }
+        const ext = path.extname(fp.filename)||'.jpg';
         const fname = `photo_${Date.now()}${ext}`;
-        fs.writeFileSync(path.join(UPLOADS_DIR, fname), filePart.data);
+        fs.writeFileSync(path.join(UPLOADS_DIR, fname), fp.data);
         const photos = JSON.parse(fs.readFileSync(PHOTOS_FILE));
         photos.push({ id: Date.now(), filename: fname, url: `/uploads/${fname}`, quarter, caption, uploadedAt: new Date().toLocaleString('vi-VN') });
         fs.writeFileSync(PHOTOS_FILE, JSON.stringify(photos, null, 2));
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: true }));
-      } catch (e) { console.error(e); res.writeHead(500); res.end('Error'); }
+      } catch(e) { res.writeHead(500); res.end('Error'); }
     });
     return;
   }
@@ -198,30 +195,23 @@ const server = http.createServer((req, res) => {
   if (pathname.startsWith('/api/photos/') && req.method === 'DELETE') {
     const id = parseInt(pathname.split('/').pop());
     let photos = JSON.parse(fs.readFileSync(PHOTOS_FILE));
-    const photo = photos.find(p => p.id === id);
-    if (photo) {
-      const fp = path.join(UPLOADS_DIR, photo.filename);
-      if (fs.existsSync(fp)) fs.unlinkSync(fp);
-    }
-    photos = photos.filter(p => p.id !== id);
+    const photo = photos.find(p => p.id===id);
+    if (photo && fs.existsSync(path.join(UPLOADS_DIR, photo.filename))) fs.unlinkSync(path.join(UPLOADS_DIR, photo.filename));
+    photos = photos.filter(p => p.id!==id);
     fs.writeFileSync(PHOTOS_FILE, JSON.stringify(photos, null, 2));
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ success: true }));
     return;
   }
 
-  // EXPORT CSV — đọc từ Sheets
+  // EXPORT CSV
   if (pathname === '/api/export/csv') {
-    sheetRequest('GET').then(data => {
+    supabase('GET', `/rest/v1/${TABLE}?select=*&order=created_at.asc`).then(data => {
       const rows = Array.isArray(data) ? data : [];
-      const headers = ['STT','Họ Tên','SĐT','Số Áo','Size','Vị Trí','Sức Khỏe','Cao(cm)','Nặng(kg)','Tốc Độ','Sức Bền','Kỹ Thuật','Chiến Thuật','Thể Lực','Chế Độ Ăn','Phương Tiện','Ghi Chú','Thời Gian'];
-      const csvRows = rows.map((d, i) => [
-        i+1, d['Họ Tên'], d['SĐT'], d['Số Áo'], d['Size'], d['Vị Trí'], d['Sức Khỏe'],
-        d['Cao'], d['Nặng'], d['Tốc Độ'], d['Sức Bền'], d['Kỹ Thuật'],
-        d['Chiến Thuật'], d['Thể Lực'], d['Chế Độ Ăn'], d['Phương Tiện'], d['Ghi Chú'], d['Thời Gian']
-      ].map(v => `"${(v||'').toString().replace(/"/g,'""')}"`).join(','));
+      const headers = ['STT','Họ Tên','SĐT','Số Áo','Size','Vị Trí','Sức Khỏe','Cao','Nặng','Tốc Độ','Sức Bền','Kỹ Thuật','Chiến Thuật','Thể Lực','Chế Độ Ăn','Phương Tiện','Ghi Chú','Thời Gian'];
+      const csvRows = rows.map((d,i) => [i+1,d.full_name,d.phone,d.jersey_number,d.jersey_size,d.position,d.health,d.height,d.weight,d.speed,d.stamina,d.technique,d.tactic,d.physical,d.diet,d.transport,d.notes,d.timestamp].map(v=>`"${(v||'').toString().replace(/"/g,'""')}"`).join(','));
       const csv = '\uFEFF' + [headers.join(','), ...csvRows].join('\r\n');
-      res.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="sport-club.csv"' });
+      res.writeHead(200, {'Content-Type':'text/csv;charset=utf-8','Content-Disposition':'attachment;filename="sport-club.csv"'});
       res.end(csv);
     }).catch(() => { res.writeHead(500); res.end('Error'); });
     return;
@@ -229,19 +219,16 @@ const server = http.createServer((req, res) => {
 
   // EXPORT XLSX
   if (pathname === '/api/export/xlsx') {
-    sheetRequest('GET').then(data => {
+    supabase('GET', `/rest/v1/${TABLE}?select=*&order=created_at.asc`).then(data => {
       const rows = Array.isArray(data) ? data : [];
-      const headers = ['STT','Họ Tên','SĐT','Số Áo','Size','Vị Trí','Sức Khỏe','Cao','Nặng','Tốc Độ','Sức Bền','Kỹ Thuật','Chiến Thuật','Thể Lực','Chế Độ Ăn','Phương Tiện','Ghi Chú','Thời Gian'];
       const esc = v => (v||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       const cell = v => `<Cell><Data ss:Type="String">${esc(v)}</Data></Cell>`;
-      let xmlRows = `<Row>${headers.map(cell).join('')}</Row>`;
-      rows.forEach((d, i) => {
-        const vals = [i+1, d['Họ Tên'], d['SĐT'], d['Số Áo'], d['Size'], d['Vị Trí'], d['Sức Khỏe'], d['Cao'], d['Nặng'], d['Tốc Độ'], d['Sức Bền'], d['Kỹ Thuật'], d['Chiến Thuật'], d['Thể Lực'], d['Chế Độ Ăn'], d['Phương Tiện'], d['Ghi Chú'], d['Thời Gian']];
-        xmlRows += `<Row>${vals.map(cell).join('')}</Row>`;
-      });
-      const xlsx = `<?xml version="1.0"?><?mso-application progid="Excel.Sheet"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="Danh Sach"><Table>${xmlRows}</Table></Worksheet></Workbook>`;
-      res.writeHead(200, { 'Content-Type': 'application/vnd.ms-excel; charset=utf-8', 'Content-Disposition': 'attachment; filename="sport-club.xls"' });
-      res.end('\uFEFF' + xlsx);
+      const h = ['STT','Họ Tên','SĐT','Số Áo','Size','Vị Trí','Sức Khỏe','Cao','Nặng','Tốc Độ','Sức Bền','Kỹ Thuật','Chiến Thuật','Thể Lực','Chế Độ Ăn','Phương Tiện','Ghi Chú','Thời Gian'];
+      let xmlRows = `<Row>${h.map(cell).join('')}</Row>`;
+      rows.forEach((d,i) => { xmlRows+=`<Row>${[i+1,d.full_name,d.phone,d.jersey_number,d.jersey_size,d.position,d.health,d.height,d.weight,d.speed,d.stamina,d.technique,d.tactic,d.physical,d.diet,d.transport,d.notes,d.timestamp].map(cell).join('')}</Row>`; });
+      const xlsx=`<?xml version="1.0"?><?mso-application progid="Excel.Sheet"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="DanhSach"><Table>${xmlRows}</Table></Worksheet></Workbook>`;
+      res.writeHead(200,{'Content-Type':'application/vnd.ms-excel;charset=utf-8','Content-Disposition':'attachment;filename="sport-club.xls"'});
+      res.end('\uFEFF'+xlsx);
     }).catch(() => { res.writeHead(500); res.end('Error'); });
     return;
   }
@@ -251,9 +238,6 @@ const server = http.createServer((req, res) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
-  console.log('');
-  console.log('✅ ===== SPORT CLUB SERVER =====');
-  console.log(`🌐 Link: http://localhost:${PORT}`);
-  console.log('💾 Database: Google Sheets');
-  console.log('================================');
+  console.log('✅ SPORT CLUB - Supabase Database');
+  console.log(`🌐 http://localhost:${PORT}`);
 });
