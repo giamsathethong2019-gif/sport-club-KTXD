@@ -5,7 +5,6 @@ const https = require('https');
 
 const SUPABASE_URL = 'https://lpkydkswxohqijjllaxi.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxwa3lka3N3eG9ocWlqamxsYXhpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUwOTEzMDQsImV4cCI6MjEwMDY2NzMwNH0.2Z--r5WVdqKbsR7-IwFghuI8xWgYS_Eyn3QQfjfdGjM';
-const TABLE = 'registrations';
 const PHOTOS_FILE = path.join(__dirname, 'photos.json');
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
 
@@ -17,31 +16,39 @@ function getPathname(reqUrl) {
   catch { return reqUrl.split('?')[0]; }
 }
 
-function supabase(method, path2, body) {
+function supabaseRequest(method, endpoint, body) {
   return new Promise((resolve, reject) => {
-    const data = body ? JSON.stringify(body) : null;
-    const urlObj = new URL(SUPABASE_URL + path2);
+    const urlObj = new URL(SUPABASE_URL + endpoint);
+    const bodyStr = body ? JSON.stringify(body) : null;
     const headers = {
       'apikey': SUPABASE_KEY,
-      'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
       'Content-Type': 'application/json',
-      'Prefer': method === 'POST' ? 'return=representation' : ''
+      'Accept': 'application/json'
     };
-    if (method === 'GET') headers['Accept'] = 'application/json';
-    const req = https.request({
+    if (method === 'POST') headers['Prefer'] = 'return=minimal';
+    if (bodyStr) headers['Content-Length'] = Buffer.byteLength(bodyStr);
+
+    const options = {
       hostname: urlObj.hostname,
-      path: urlObj.pathname + (urlObj.search || ''),
-      method, headers
-    }, (res) => {
-      let raw = '';
-      res.on('data', c => raw += c);
+      path: urlObj.pathname + urlObj.search,
+      method,
+      headers
+    };
+
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
       res.on('end', () => {
-        try { resolve(JSON.parse(raw)); }
-        catch { resolve(raw); }
+        try {
+          resolve(data ? JSON.parse(data) : []);
+        } catch {
+          resolve([]);
+        }
       });
     });
     req.on('error', reject);
-    if (data) req.write(data);
+    if (bodyStr) req.write(bodyStr);
     req.end();
   });
 }
@@ -99,9 +106,8 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // GET registrations từ Supabase
   if (pathname === '/api/registrations' && req.method === 'GET') {
-    supabase('GET', `/rest/v1/${TABLE}?select=*&order=created_at.asc`).then(data => {
+    supabaseRequest('GET', '/rest/v1/registrations?select=*&order=created_at.asc').then(data => {
       const result = Array.isArray(data) ? data.map((d,i) => ({
         id: d.id, timestamp: d.timestamp||'',
         fullName: d.full_name||'', phone: d.phone||'',
@@ -115,11 +121,13 @@ const server = http.createServer((req, res) => {
       })) : [];
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(result));
-    }).catch(() => { res.writeHead(200); res.end('[]'); });
+    }).catch(e => {
+      console.error('GET error:', e.message);
+      res.writeHead(200); res.end('[]');
+    });
     return;
   }
 
-  // POST register vào Supabase
   if (pathname === '/api/register' && req.method === 'POST') {
     let body = '';
     req.on('data', c => body += c);
@@ -128,42 +136,42 @@ const server = http.createServer((req, res) => {
         const d = JSON.parse(body);
         const row = {
           timestamp: new Date().toLocaleString('vi-VN'),
-          full_name: d.fullName, phone: d.phone,
-          jersey_number: d.jerseyNumber, jersey_size: d.jerseySize,
-          position: d.position, health: d.health,
-          height: d.height, weight: d.weight,
-          speed: d.speed, stamina: d.stamina,
-          technique: d.technique, tactic: d.tactic,
-          physical: d.physical, diet: d.diet,
-          transport: d.transport, notes: d.notes
+          full_name: d.fullName||'', phone: d.phone||'',
+          jersey_number: d.jerseyNumber||'', jersey_size: d.jerseySize||'',
+          position: d.position||'', health: d.health||'',
+          height: d.height||'', weight: d.weight||'',
+          speed: d.speed||'', stamina: d.stamina||'',
+          technique: d.technique||'', tactic: d.tactic||'',
+          physical: d.physical||'', diet: d.diet||'',
+          transport: d.transport||'', notes: d.notes||''
         };
-        supabase('POST', `/rest/v1/${TABLE}`, row).then(r => {
+        supabaseRequest('POST', '/rest/v1/registrations', row).then(() => {
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ success: true }));
-        }).catch(() => { res.writeHead(500); res.end(JSON.stringify({ success: false })); });
+        }).catch(e => {
+          console.error('POST error:', e.message);
+          res.writeHead(500); res.end(JSON.stringify({ success: false }));
+        });
       } catch(e) { res.writeHead(400); res.end(JSON.stringify({ success: false })); }
     });
     return;
   }
 
-  // DELETE registration
   if (pathname.startsWith('/api/registrations/') && req.method === 'DELETE') {
     const id = pathname.split('/').pop();
-    supabase('DELETE', `/rest/v1/${TABLE}?id=eq.${id}`).then(() => {
+    supabaseRequest('DELETE', `/rest/v1/registrations?id=eq.${id}`).then(() => {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true }));
     }).catch(() => { res.writeHead(500); res.end(JSON.stringify({ success: false })); });
     return;
   }
 
-  // GET photos
   if (pathname === '/api/photos' && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(fs.readFileSync(PHOTOS_FILE));
+    res.end(fs.existsSync(PHOTOS_FILE) ? fs.readFileSync(PHOTOS_FILE) : '[]');
     return;
   }
 
-  // POST upload photo
   if (pathname === '/api/photos/upload' && req.method === 'POST') {
     const chunks = [];
     req.on('data', c => chunks.push(c));
@@ -181,7 +189,7 @@ const server = http.createServer((req, res) => {
         const ext = path.extname(fp.filename)||'.jpg';
         const fname = `photo_${Date.now()}${ext}`;
         fs.writeFileSync(path.join(UPLOADS_DIR, fname), fp.data);
-        const photos = JSON.parse(fs.readFileSync(PHOTOS_FILE));
+        const photos = JSON.parse(fs.existsSync(PHOTOS_FILE) ? fs.readFileSync(PHOTOS_FILE) : '[]');
         photos.push({ id: Date.now(), filename: fname, url: `/uploads/${fname}`, quarter, caption, uploadedAt: new Date().toLocaleString('vi-VN') });
         fs.writeFileSync(PHOTOS_FILE, JSON.stringify(photos, null, 2));
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -191,12 +199,11 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // DELETE photo
   if (pathname.startsWith('/api/photos/') && req.method === 'DELETE') {
     const id = parseInt(pathname.split('/').pop());
-    let photos = JSON.parse(fs.readFileSync(PHOTOS_FILE));
+    let photos = JSON.parse(fs.existsSync(PHOTOS_FILE) ? fs.readFileSync(PHOTOS_FILE) : '[]');
     const photo = photos.find(p => p.id===id);
-    if (photo && fs.existsSync(path.join(UPLOADS_DIR, photo.filename))) fs.unlinkSync(path.join(UPLOADS_DIR, photo.filename));
+    if (photo) { const fp = path.join(UPLOADS_DIR, photo.filename); if (fs.existsSync(fp)) fs.unlinkSync(fp); }
     photos = photos.filter(p => p.id!==id);
     fs.writeFileSync(PHOTOS_FILE, JSON.stringify(photos, null, 2));
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -204,22 +211,20 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // EXPORT CSV
   if (pathname === '/api/export/csv') {
-    supabase('GET', `/rest/v1/${TABLE}?select=*&order=created_at.asc`).then(data => {
+    supabaseRequest('GET', '/rest/v1/registrations?select=*&order=created_at.asc').then(data => {
       const rows = Array.isArray(data) ? data : [];
-      const headers = ['STT','Họ Tên','SĐT','Số Áo','Size','Vị Trí','Sức Khỏe','Cao','Nặng','Tốc Độ','Sức Bền','Kỹ Thuật','Chiến Thuật','Thể Lực','Chế Độ Ăn','Phương Tiện','Ghi Chú','Thời Gian'];
+      const h = ['STT','Họ Tên','SĐT','Số Áo','Size','Vị Trí','Sức Khỏe','Cao','Nặng','Tốc Độ','Sức Bền','Kỹ Thuật','Chiến Thuật','Thể Lực','Chế Độ Ăn','Phương Tiện','Ghi Chú','Thời Gian'];
       const csvRows = rows.map((d,i) => [i+1,d.full_name,d.phone,d.jersey_number,d.jersey_size,d.position,d.health,d.height,d.weight,d.speed,d.stamina,d.technique,d.tactic,d.physical,d.diet,d.transport,d.notes,d.timestamp].map(v=>`"${(v||'').toString().replace(/"/g,'""')}"`).join(','));
-      const csv = '\uFEFF' + [headers.join(','), ...csvRows].join('\r\n');
+      const csv = '\uFEFF' + [h.join(','), ...csvRows].join('\r\n');
       res.writeHead(200, {'Content-Type':'text/csv;charset=utf-8','Content-Disposition':'attachment;filename="sport-club.csv"'});
       res.end(csv);
     }).catch(() => { res.writeHead(500); res.end('Error'); });
     return;
   }
 
-  // EXPORT XLSX
   if (pathname === '/api/export/xlsx') {
-    supabase('GET', `/rest/v1/${TABLE}?select=*&order=created_at.asc`).then(data => {
+    supabaseRequest('GET', '/rest/v1/registrations?select=*&order=created_at.asc').then(data => {
       const rows = Array.isArray(data) ? data : [];
       const esc = v => (v||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       const cell = v => `<Cell><Data ss:Type="String">${esc(v)}</Data></Cell>`;
@@ -238,6 +243,6 @@ const server = http.createServer((req, res) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
-  console.log('✅ SPORT CLUB - Supabase Database');
-  console.log(`🌐 http://localhost:${PORT}`);
+  console.log(`✅ Sport Club Server running on port ${PORT}`);
+  console.log(`💾 Database: Supabase`);
 });
