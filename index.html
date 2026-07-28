@@ -341,6 +341,11 @@ tr:hover td{background:rgba(255,255,255,.03)}
 const API = window.location.origin;
 let allPhotos = [], currentQuarter = 'ALL';
 
+async function fetchJson(url){
+  const res = await fetch(url, { cache: 'no-store' });
+  return await res.json();
+}
+
 // ---- PARTICLES ----
 const pc = document.getElementById('particles');
 ['⚽','🏆','🥇','⭐','🎯','🔥','🏅','⚡'].forEach(e=>{
@@ -406,8 +411,8 @@ document.getElementById('regForm').addEventListener('submit',async e=>{
 // ---- LOAD STATS ----
 async function loadStats(){
   try{
-    const data=await(await fetch(API+'/api/registrations')).json();
-    const photos=await(await fetch(API+'/api/photos')).json();
+    const data=await fetchJson(API+'/api/registrations');
+    const photos=await fetchJson(API+'/api/photos');
     document.getElementById('sTotal').textContent=data.length;
     document.getElementById('sPos').textContent=data.filter(d=>d.position&&d.position!=='Chưa chọn').length;
     document.getElementById('sPhotos').textContent=photos.length;
@@ -422,7 +427,7 @@ async function loadStats(){
 // ---- LOAD LIST ----
 async function loadList(){
   try{
-    const data=await(await fetch(API+'/api/registrations')).json();
+    const data=await fetchJson(API+'/api/registrations');
     const posC={'Thủ môn':'bo','Hậu vệ':'bb','Tiền vệ':'bg','Tiền đạo':'br','Linh hoạt':'bb','Chưa chọn':'bo'};
     const body=document.getElementById('tableBody');
     if(!data.length){body.innerHTML='<tr><td colspan="10" class="no-data">Chưa có đăng ký nào</td></tr>';return;}
@@ -455,7 +460,7 @@ function exportData(type){
 
 async function loadPreview(){
   try{
-    const data=await(await fetch(API+'/api/registrations')).json();
+    const data=await fetchJson(API+'/api/registrations');
     const el=document.getElementById('previewTable');
     if(!data.length){el.innerHTML='<div class="no-data">Chưa có dữ liệu</div>';return;}
     el.innerHTML=`<div class="tbl-wrap"><table>
@@ -468,7 +473,7 @@ async function loadPreview(){
 // ---- PHOTOS ----
 async function loadPhotos(){
   try{
-    allPhotos=await(await fetch(API+'/api/photos')).json();
+    allPhotos=await fetchJson(API+'/api/photos');
     renderPhotos();
     loadStats();
   }catch{}
@@ -526,7 +531,7 @@ async function deletePhoto(id){
 // ---- AI ANALYSIS ----
 async function loadPlayerSelect(){
   try{
-    const data=await(await fetch(API+'/api/registrations')).json();
+    const data=await fetchJson(API+'/api/registrations');
     const sel=document.getElementById('playerSelect');
     sel.innerHTML='<option value="">-- Chọn cầu thủ --</option>'+data.map(d=>`<option value="${d.id}">${d.fullName} – #${d.jerseyNumber} ${d.position?'('+d.position+')':''}</option>`).join('');
     if(data.length) showTeamOverview(data);
@@ -536,7 +541,7 @@ async function loadPlayerSelect(){
 async function analyzePlayer(){
   const id=document.getElementById('playerSelect').value;
   if(!id){toast('⚠️ Chọn cầu thủ trước!','error');return;}
-  const data=await(await fetch(API+'/api/registrations')).json();
+  const data=await fetchJson(API+'/api/registrations');
   const player=data.find(d=>d.id==id);
   if(!player) return;
   
@@ -669,6 +674,7 @@ function showTeamOverview(data){
 
 // INIT
 loadStats();
+setInterval(loadStats, 30000);
 </script>
 </body>
 </html>
