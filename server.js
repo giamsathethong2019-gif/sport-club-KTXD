@@ -2,17 +2,29 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
-
-const SUPABASE_URL = 'https://lpkydkswxohqijjllaxi.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxwa3lka3N3eG9ocWlqamxsYXhpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUwOTEzMDQsImV4cCI6MjEwMDY2NzMwNH0.2Z--r5WVdqKbsR7-IwFghuI8xWgYS_Eyn3QQfjfdGjM';
+const crypto = require('crypto');
 
 const REGISTRATIONS_FILE = path.join(__dirname, 'registrations.json');
 const PHOTOS_FILE = path.join(__dirname, 'photos.json');
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
 
+const GOOGLE_SPREADSHEET_ID = process.env.GOOGLE_SHEETS_SPREADSHEET_ID || '';
+const GOOGLE_CLIENT_EMAIL = process.env.GOOGLE_SHEETS_CLIENT_EMAIL || '';
+const GOOGLE_PRIVATE_KEY = (process.env.GOOGLE_SHEETS_PRIVATE_KEY || '').replace(/\\n/g, '\n');
+const GOOGLE_SHEET_NAME = process.env.GOOGLE_SHEETS_TAB_NAME || 'Registrations';
+const GOOGLE_ENABLED = Boolean(GOOGLE_SPREADSHEET_ID && GOOGLE_CLIENT_EMAIL && GOOGLE_PRIVATE_KEY);
+
+const REG_HEADERS = [
+  'id', 'timestamp', 'fullName', 'phone', 'jerseyNumber', 'jerseySize',
+  'position', 'health', 'height', 'weight', 'speed', 'stamina',
+  'technique', 'tactic', 'physical', 'diet', 'transport', 'notes'
+];
+
 if (!fs.existsSync(REGISTRATIONS_FILE)) fs.writeFileSync(REGISTRATIONS_FILE, '[]');
 if (!fs.existsSync(PHOTOS_FILE)) fs.writeFileSync(PHOTOS_FILE, '[]');
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR);
+
+let googleTokenCache = { token: '', exp: 0 };
 
 function getPathname(reqUrl) {
   try { return new URL(reqUrl, 'http://localhost').pathname; }
@@ -34,45 +46,10 @@ function writeJsonArray(filePath, data) {
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
 }
 
-function supabaseRequest(method, endpoint, body) {
-  return new Promise((resolve, reject) => {
-    const urlObj = new URL(SUPABASE_URL + endpoint);
-    const bodyStr = body ? JSON.stringify(body) : null;
-    const headers = {
-      apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${SUPABASE_KEY}`,
-      'Content-Type': 'application/json',
-      Accept: 'application/json'
-    };
-    if (method === 'POST') headers.Prefer = 'return=minimal';
-    if (bodyStr) headers['Content-Length'] = Buffer.byteLength(bodyStr);
-
-    const req = https.request({
-      hostname: urlObj.hostname,
-      path: urlObj.pathname + urlObj.search,
-      method,
-      headers
-    }, (res) => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => {
-        try {
-          resolve(data ? JSON.parse(data) : []);
-        } catch {
-          resolve([]);
-        }
-      });
-    });
-
-    req.on('error', reject);
-    if (bodyStr) req.write(bodyStr);
-    req.end();
-  });
-}
-
 function normalizeRegistration(row, fallbackId) {
+  const id = row.id ?? fallbackId;
   return {
-    id: row.id ?? fallbackId,
+    id: Number.isFinite(Number(id)) ? Number(id) : String(id),
     timestamp: row.timestamp || '',
     fullName: row.fullName || row.full_name || '',
     phone: row.phone || '',
@@ -93,85 +70,215 @@ function normalizeRegistration(row, fallbackId) {
   };
 }
 
-function toSupabaseRow(row) {
-  return {
-    timestamp: row.timestamp || new Date().toLocaleString('vi-VN'),
-    full_name: row.fullName || '',
-    phone: row.phone || '',
-    jersey_number: row.jerseyNumber || '',
-    jersey_size: row.jerseySize || '',
-    position: row.position || '',
-    health: row.health || '',
-    height: row.height || '',
-    weight: row.weight || '',
-    speed: row.speed || '',
-    stamina: row.stamina || '',
-    technique: row.technique || '',
-    tactic: row.tactic || '',
-    physical: row.physical || '',
-    diet: row.diet || '',
-    transport: row.transport || '',
-    notes: row.notes || ''
-  };
+function registrationToSheetRow(row) {
+  return [
+    String(row.id || ''),
+    row.timestamp || '',
+    row.fullName || '',
+    row.phone || '',
+    row.jerseyNumber || '',
+    row.jerseySize || '',
+    row.position || '',
+    row.health || '',
+    row.height || '',
+    row.weight || '',
+    row.speed || '',
+    row.stamina || '',
+    row.technique || '',
+    row.tactic || '',
+    row.physical || '',
+    row.diet || '',
+    row.transport || '',
+    row.notes || ''
+  ];
 }
 
-function readRegistrations() {
+function sheetRowToRegistration(values, index) {
+  const v = values || [];
+  return normalizeRegistration({
+    id: v[0] || Date.now() + index,
+    timestamp: v[1] || '',
+    fullName: v[2] || '',
+    phone: v[3] || '',
+    jerseyNumber: v[4] || '',
+    jerseySize: v[5] || '',
+    position: v[6] || '',
+    health: v[7] || '',
+    height: v[8] || '',
+    weight: v[9] || '',
+    speed: v[10] || '',
+    stamina: v[11] || '',
+    technique: v[12] || '',
+    tactic: v[13] || '',
+    physical: v[14] || '',
+    diet: v[15] || '',
+    transport: v[16] || '',
+    notes: v[17] || ''
+  }, v[0] || Date.now() + index);
+}
+
+function readRegistrationsLocal() {
   return readJsonArray(REGISTRATIONS_FILE).map((row, i) => normalizeRegistration(row, row.id ?? Date.now() + i));
 }
 
-function writeRegistrations(rows) {
+function writeRegistrationsLocal(rows) {
   writeJsonArray(REGISTRATIONS_FILE, rows);
 }
 
-function loadRemoteRegistrations() {
-  return supabaseRequest('GET', '/rest/v1/registrations?select=*&order=created_at.asc').then(data => {
-    const rows = Array.isArray(data)
-      ? data.map((d, i) => normalizeRegistration({
-          id: d.id,
-          timestamp: d.timestamp,
-          full_name: d.full_name,
-          phone: d.phone,
-          jersey_number: d.jersey_number,
-          jersey_size: d.jersey_size,
-          position: d.position,
-          health: d.health,
-          height: d.height,
-          weight: d.weight,
-          speed: d.speed,
-          stamina: d.stamina,
-          technique: d.technique,
-          tactic: d.tactic,
-          physical: d.physical,
-          diet: d.diet,
-          transport: d.transport,
-          notes: d.notes
-        }, d.id ?? Date.now() + i))
-      : [];
-    if (rows.length) writeRegistrations(rows);
-    return rows;
-  });
+function base64url(input) {
+  return Buffer.from(input).toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
 }
 
-function ensureRegistrations(callback) {
-  const local = readRegistrations();
-  if (local.length) return Promise.resolve(local);
-  return loadRemoteRegistrations().then(rows => rows.length ? rows : []);
-}
-
-function syncMissingRegistrations(rows) {
-  if (!rows.length) return;
-  supabaseRequest('GET', '/rest/v1/registrations?select=id').then(remote => {
-    const remoteIds = new Set((Array.isArray(remote) ? remote : []).map(r => String(r.id)));
-    rows.forEach(row => {
-      if (!remoteIds.has(String(row.id))) {
-        supabaseRequest('POST', '/rest/v1/registrations', toSupabaseRow(row)).catch(err => {
-          console.error('Supabase sync error:', err.message);
-        });
+function httpsJsonRequest(hostname, pathName, method, body, headers = {}) {
+  return new Promise((resolve, reject) => {
+    const bodyStr = body === undefined || body === null ? null : (typeof body === 'string' ? body : JSON.stringify(body));
+    const req = https.request({
+      hostname,
+      path: pathName,
+      method,
+      headers: {
+        Accept: 'application/json',
+        ...headers,
+        ...(bodyStr ? { 'Content-Length': Buffer.byteLength(bodyStr) } : {})
       }
+    }, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        const isJson = (res.headers['content-type'] || '').includes('application/json');
+        if (!data) return resolve({});
+        if (!isJson) return resolve(data);
+        try { resolve(JSON.parse(data)); }
+        catch { resolve({}); }
+      });
     });
-  }).catch(err => {
-    console.error('Supabase sync skipped:', err.message);
+    req.on('error', reject);
+    if (bodyStr) req.write(bodyStr);
+    req.end();
   });
+}
+
+async function getGoogleAccessToken() {
+  if (!GOOGLE_ENABLED) throw new Error('Google Sheets is not configured');
+  const now = Math.floor(Date.now() / 1000);
+  if (googleTokenCache.token && googleTokenCache.exp > now + 60) return googleTokenCache.token;
+
+  const header = { alg: 'RS256', typ: 'JWT' };
+  const payload = {
+    iss: GOOGLE_CLIENT_EMAIL,
+    scope: 'https://www.googleapis.com/auth/spreadsheets',
+    aud: 'https://oauth2.googleapis.com/token',
+    iat: now,
+    exp: now + 3600
+  };
+  const unsignedJwt = `${base64url(JSON.stringify(header))}.${base64url(JSON.stringify(payload))}`;
+  const signer = crypto.createSign('RSA-SHA256');
+  signer.update(unsignedJwt);
+  signer.end();
+  const signature = signer.sign(GOOGLE_PRIVATE_KEY, 'base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+  const assertion = `${unsignedJwt}.${signature}`;
+  const form = new URLSearchParams({
+    grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+    assertion
+  }).toString();
+
+  const tokenData = await httpsJsonRequest(
+    'oauth2.googleapis.com',
+    '/token',
+    'POST',
+    form,
+    {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Content-Length': Buffer.byteLength(form)
+    }
+  );
+
+  if (!tokenData.access_token) {
+    throw new Error('Failed to obtain Google access token');
+  }
+
+  googleTokenCache = {
+    token: tokenData.access_token,
+    exp: now + Number(tokenData.expires_in || 3600)
+  };
+  return googleTokenCache.token;
+}
+
+async function googleSheetsRequest(method, endpoint, body) {
+  const token = await getGoogleAccessToken();
+  return httpsJsonRequest(
+    'sheets.googleapis.com',
+    endpoint,
+    method,
+    body,
+    {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    }
+  );
+}
+
+async function fetchGoogleRegistrations() {
+  const range = encodeURIComponent(`${GOOGLE_SHEET_NAME}!A1:R`);
+  const data = await googleSheetsRequest('GET', `/v4/spreadsheets/${GOOGLE_SPREADSHEET_ID}/values/${range}`);
+  const values = Array.isArray(data.values) ? data.values : [];
+  if (values.length <= 1) return [];
+  return values.slice(1).map(sheetRowToRegistration);
+}
+
+async function replaceGoogleRegistrations(rows) {
+  const range = encodeURIComponent(`${GOOGLE_SHEET_NAME}!A1`);
+  const values = [REG_HEADERS, ...rows.map(registrationToSheetRow)];
+  await googleSheetsRequest(
+    'PUT',
+    `/v4/spreadsheets/${GOOGLE_SPREADSHEET_ID}/values/${range}?valueInputOption=RAW`,
+    { range: `${GOOGLE_SHEET_NAME}!A1`, majorDimension: 'ROWS', values }
+  );
+}
+
+async function clearGoogleRegistrations() {
+  const range = encodeURIComponent(`${GOOGLE_SHEET_NAME}!A:R`);
+  await googleSheetsRequest('POST', `/v4/spreadsheets/${GOOGLE_SPREADSHEET_ID}/values/${range}:clear`, {});
+}
+
+async function resolveRegistrations() {
+  const local = readRegistrationsLocal();
+  if (!GOOGLE_ENABLED) return local;
+
+  try {
+    const sheetRows = await fetchGoogleRegistrations();
+    if (sheetRows.length) {
+      writeRegistrationsLocal(sheetRows);
+      return sheetRows;
+    }
+    if (local.length) {
+      await clearGoogleRegistrations();
+      await replaceGoogleRegistrations(local);
+      return local;
+    }
+    return [];
+  } catch (e) {
+    console.error('Google Sheets read error:', e.message);
+    return local;
+  }
+}
+
+async function persistRegistrations(rows) {
+  writeRegistrationsLocal(rows);
+  if (!GOOGLE_ENABLED) return;
+  await clearGoogleRegistrations();
+  await replaceGoogleRegistrations(rows);
+}
+
+function syncLocalPhotos() {
+  const photos = readJsonArray(PHOTOS_FILE);
+  return photos;
 }
 
 function parseMultipart(buffer, boundary) {
@@ -203,6 +310,11 @@ function parseMultipart(buffer, boundary) {
   return parts;
 }
 
+function sendJson(res, statusCode, payload) {
+  res.writeHead(statusCode, { 'Content-Type': 'application/json; charset=utf-8' });
+  res.end(JSON.stringify(payload));
+}
+
 const server = http.createServer((req, res) => {
   const pathname = getPathname(req.url);
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -226,23 +338,36 @@ const server = http.createServer((req, res) => {
     fs.readFile(file, (err, data) => {
       if (err) { res.writeHead(404); res.end(); return; }
       const ext = path.extname(file).toLowerCase();
-      const mime = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.gif': 'image/gif', '.webp': 'image/webp', '.mp4': 'video/mp4' }[ext] || 'application/octet-stream';
+      const mime = {
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.png': 'image/png',
+        '.gif': 'image/gif',
+        '.webp': 'image/webp',
+        '.mp4': 'video/mp4'
+      }[ext] || 'application/octet-stream';
       res.writeHead(200, { 'Content-Type': mime });
       res.end(data);
     });
     return;
   }
 
+  if (pathname === '/api/meta' && req.method === 'GET') {
+    sendJson(res, 200, {
+      googleSheets: GOOGLE_ENABLED,
+      sheetName: GOOGLE_SHEET_NAME,
+      localCache: true
+    });
+    return;
+  }
+
   if (pathname === '/api/registrations' && req.method === 'GET') {
-    ensureRegistrations().then(rows => {
-      const result = rows.length ? rows : [];
-      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-      res.end(JSON.stringify(result));
-      if (result.length) syncMissingRegistrations(result);
-    }).catch(err => {
+    (async () => {
+      const rows = await resolveRegistrations();
+      sendJson(res, 200, rows);
+    })().catch(err => {
       console.error('GET registrations error:', err.message);
-      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-      res.end('[]');
+      sendJson(res, 200, readRegistrationsLocal());
     });
     return;
   }
@@ -251,8 +376,8 @@ const server = http.createServer((req, res) => {
     let body = '';
     req.on('data', c => body += c);
     req.on('end', () => {
-      try {
-        const d = JSON.parse(body);
+      (async () => {
+        const d = JSON.parse(body || '{}');
         const row = normalizeRegistration({
           id: Date.now(),
           timestamp: new Date().toLocaleString('vi-VN'),
@@ -274,36 +399,34 @@ const server = http.createServer((req, res) => {
           notes: d.notes || ''
         });
 
-        const rows = readRegistrations();
-        rows.push(row);
-        writeRegistrations(rows);
-        syncMissingRegistrations([row]);
-        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-        res.end(JSON.stringify({ success: true, id: row.id }));
-      } catch (e) {
-        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
-        res.end(JSON.stringify({ success: false, message: 'Bad request' }));
-      }
+        const rows = await resolveRegistrations();
+        const nextRows = [...rows, row];
+        await persistRegistrations(nextRows);
+        sendJson(res, 200, { success: true, id: row.id });
+      })().catch(err => {
+        console.error('POST registrations error:', err.message);
+        sendJson(res, 500, { success: false, message: 'Could not save registration' });
+      });
     });
     return;
   }
 
   if (pathname.startsWith('/api/registrations/') && req.method === 'DELETE') {
     const id = pathname.split('/').pop();
-    const rows = readRegistrations();
-    const nextRows = rows.filter(row => String(row.id) !== String(id));
-    writeRegistrations(nextRows);
-    supabaseRequest('DELETE', `/rest/v1/registrations?id=eq.${id}`).catch(err => {
-      console.error('DELETE sync error:', err.message);
+    (async () => {
+      const rows = await resolveRegistrations();
+      const nextRows = rows.filter(row => String(row.id) !== String(id));
+      await persistRegistrations(nextRows);
+      sendJson(res, 200, { success: true });
+    })().catch(err => {
+      console.error('DELETE registrations error:', err.message);
+      sendJson(res, 500, { success: false, message: 'Could not delete registration' });
     });
-    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-    res.end(JSON.stringify({ success: true }));
     return;
   }
 
   if (pathname === '/api/photos' && req.method === 'GET') {
-    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-    res.end(fs.existsSync(PHOTOS_FILE) ? fs.readFileSync(PHOTOS_FILE) : '[]');
+    sendJson(res, 200, syncLocalPhotos());
     return;
   }
 
@@ -334,8 +457,7 @@ const server = http.createServer((req, res) => {
           uploadedAt: new Date().toLocaleString('vi-VN')
         });
         writeJsonArray(PHOTOS_FILE, photos);
-        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-        res.end(JSON.stringify({ success: true }));
+        sendJson(res, 200, { success: true });
       } catch (e) {
         res.writeHead(500);
         res.end('Error');
@@ -354,45 +476,56 @@ const server = http.createServer((req, res) => {
     }
     photos = photos.filter(p => p.id !== id);
     writeJsonArray(PHOTOS_FILE, photos);
-    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-    res.end(JSON.stringify({ success: true }));
+    sendJson(res, 200, { success: true });
     return;
   }
 
   if (pathname === '/api/export/csv') {
-    const rows = readRegistrations();
-    const h = ['STT','Ho Ten','SDT','So Ao','Size','Vi Tri','Suc Khoe','Cao','Nang','Toc Do','Suc Ben','Ky Thuat','Chien Thuat','The Luc','Che Do An','Phuong Tien','Ghi Chu','Thoi Gian'];
-    const csvRows = rows.map((d, i) => [
-      i + 1, d.fullName, d.phone, d.jerseyNumber, d.jerseySize, d.position, d.health, d.height, d.weight,
-      d.speed, d.stamina, d.technique, d.tactic, d.physical, d.diet, d.transport, d.notes, d.timestamp
-    ].map(v => `"${(v || '').toString().replace(/"/g, '""')}"`).join(','));
-    const csv = '\uFEFF' + [h.join(','), ...csvRows].join('\r\n');
-    res.writeHead(200, {
-      'Content-Type': 'text/csv;charset=utf-8',
-      'Content-Disposition': 'attachment;filename="sport-club.csv"'
+    (async () => {
+      const rows = await resolveRegistrations();
+      const h = ['STT', 'Ho Ten', 'SDT', 'So Ao', 'Size', 'Vi Tri', 'Suc Khoe', 'Cao', 'Nang', 'Toc Do', 'Suc Ben', 'Ky Thuat', 'Chien Thuat', 'The Luc', 'Che Do An', 'Phuong Tien', 'Ghi Chu', 'Thoi Gian'];
+      const csvRows = rows.map((d, i) => [
+        i + 1, d.fullName, d.phone, d.jerseyNumber, d.jerseySize, d.position, d.health, d.height, d.weight,
+        d.speed, d.stamina, d.technique, d.tactic, d.physical, d.diet, d.transport, d.notes, d.timestamp
+      ].map(v => `"${(v || '').toString().replace(/"/g, '""')}"`).join(','));
+      const csv = '\uFEFF' + [h.join(','), ...csvRows].join('\r\n');
+      res.writeHead(200, {
+        'Content-Type': 'text/csv;charset=utf-8',
+        'Content-Disposition': 'attachment;filename="sport-club.csv"'
+      });
+      res.end(csv);
+    })().catch(err => {
+      console.error('CSV export error:', err.message);
+      res.writeHead(500);
+      res.end('Error');
     });
-    res.end(csv);
     return;
   }
 
   if (pathname === '/api/export/xlsx') {
-    const rows = readRegistrations();
-    const esc = v => (v || '').toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const cell = v => `<Cell><Data ss:Type="String">${esc(v)}</Data></Cell>`;
-    const h = ['STT','Ho Ten','SDT','So Ao','Size','Vi Tri','Suc Khoe','Cao','Nang','Toc Do','Suc Ben','Ky Thuat','Chien Thuat','The Luc','Che Do An','Phuong Tien','Ghi Chu','Thoi Gian'];
-    let xmlRows = `<Row>${h.map(cell).join('')}</Row>`;
-    rows.forEach((d, i) => {
-      xmlRows += `<Row>${[
-        i + 1, d.fullName, d.phone, d.jerseyNumber, d.jerseySize, d.position, d.health, d.height, d.weight,
-        d.speed, d.stamina, d.technique, d.tactic, d.physical, d.diet, d.transport, d.notes, d.timestamp
-      ].map(cell).join('')}</Row>`;
+    (async () => {
+      const rows = await resolveRegistrations();
+      const esc = v => (v || '').toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const cell = v => `<Cell><Data ss:Type="String">${esc(v)}</Data></Cell>`;
+      const h = ['STT', 'Ho Ten', 'SDT', 'So Ao', 'Size', 'Vi Tri', 'Suc Khoe', 'Cao', 'Nang', 'Toc Do', 'Suc Ben', 'Ky Thuat', 'Chien Thuat', 'The Luc', 'Che Do An', 'Phuong Tien', 'Ghi Chu', 'Thoi Gian'];
+      let xmlRows = `<Row>${h.map(cell).join('')}</Row>`;
+      rows.forEach((d, i) => {
+        xmlRows += `<Row>${[
+          i + 1, d.fullName, d.phone, d.jerseyNumber, d.jerseySize, d.position, d.health, d.height, d.weight,
+          d.speed, d.stamina, d.technique, d.tactic, d.physical, d.diet, d.transport, d.notes, d.timestamp
+        ].map(cell).join('')}</Row>`;
+      });
+      const xlsx = `<?xml version="1.0"?><?mso-application progid="Excel.Sheet"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="DanhSach"><Table>${xmlRows}</Table></Worksheet></Workbook>`;
+      res.writeHead(200, {
+        'Content-Type': 'application/vnd.ms-excel;charset=utf-8',
+        'Content-Disposition': 'attachment;filename="sport-club.xls"'
+      });
+      res.end('\uFEFF' + xlsx);
+    })().catch(err => {
+      console.error('XLS export error:', err.message);
+      res.writeHead(500);
+      res.end('Error');
     });
-    const xlsx = `<?xml version="1.0"?><?mso-application progid="Excel.Sheet"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="DanhSach"><Table>${xmlRows}</Table></Worksheet></Workbook>`;
-    res.writeHead(200, {
-      'Content-Type': 'application/vnd.ms-excel;charset=utf-8',
-      'Content-Disposition': 'attachment;filename="sport-club.xls"'
-    });
-    res.end('\uFEFF' + xlsx);
     return;
   }
 
@@ -403,5 +536,5 @@ const server = http.createServer((req, res) => {
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Sport Club server running on port ${PORT}`);
-  console.log('Storage: local registrations.json with Supabase sync fallback');
+  console.log(`Google Sheets enabled: ${GOOGLE_ENABLED ? 'yes' : 'no'}`);
 });
