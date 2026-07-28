@@ -51,6 +51,10 @@ input[type=range]{padding:4px 0;cursor:pointer;accent-color:var(--gold)}
 .stat-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;text-align:center}
 .stat-num{font-size:1.8em;font-weight:900;background:linear-gradient(90deg,#FFD700,#FFA500);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 .stat-lbl{font-size:.72em;color:rgba(255,255,255,.5);margin-top:3px;text-transform:uppercase;letter-spacing:.5px}
+.source-banner{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:-4px 0 18px;padding:10px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);font-size:.84em;color:rgba(255,255,255,.8)}
+.source-pill{padding:5px 10px;border-radius:999px;font-weight:800;letter-spacing:.3px;font-size:.78em;text-transform:uppercase}
+.source-pill.ok{background:rgba(46,213,115,.16);color:var(--green);border:1px solid rgba(46,213,115,.28)}
+.source-pill.warn{background:rgba(255,165,0,.14);color:#ffa500;border:1px solid rgba(255,165,0,.28)}
 
 /* BUTTONS */
 .btn{padding:13px 22px;border:none;border-radius:10px;font-weight:700;cursor:pointer;transition:all .3s;font-size:.9em;letter-spacing:.5px}
@@ -150,6 +154,10 @@ tr:hover td{background:rgba(255,255,255,.03)}
     <div class="stat-card"><div class="stat-num" id="sPos">0</div><div class="stat-lbl">Có vị trí</div></div>
     <div class="stat-card"><div class="stat-num" id="sPhotos">0</div><div class="stat-lbl">Ảnh sinh hoạt</div></div>
     <div class="stat-card"><div class="stat-num" id="sSize">--</div><div class="stat-lbl">Size phổ biến</div></div>
+  </div>
+  <div class="source-banner" id="sourceBanner">
+    <span id="sourceText">Đang kiểm tra nguồn dữ liệu...</span>
+    <span class="source-pill warn" id="sourcePill">Đợi cấu hình</span>
   </div>
 
   <!-- TABS -->
@@ -424,6 +432,29 @@ async function loadStats(){
   }catch{}
 }
 
+async function loadMeta(){
+  try{
+    const meta=await fetchJson(API+'/api/meta');
+    const text=document.getElementById('sourceText');
+    const pill=document.getElementById('sourcePill');
+    if(meta.googleSheets){
+      text.textContent=`Nguồn chính: Google Sheets · Tab ${meta.sheetName||'Registrations'}`;
+      pill.textContent='Đang đồng bộ';
+      pill.className='source-pill ok';
+    }else{
+      text.textContent='Nguồn chính chưa cấu hình Google Sheets, đang dùng cache local.';
+      pill.textContent='Local cache';
+      pill.className='source-pill warn';
+    }
+  }catch{
+    const text=document.getElementById('sourceText');
+    const pill=document.getElementById('sourcePill');
+    text.textContent='Không đọc được trạng thái nguồn dữ liệu.';
+    pill.textContent='Lỗi kết nối';
+    pill.className='source-pill warn';
+  }
+}
+
 // ---- LOAD LIST ----
 async function loadList(){
   try{
@@ -674,7 +705,9 @@ function showTeamOverview(data){
 
 // INIT
 loadStats();
+loadMeta();
 setInterval(loadStats, 30000);
+setInterval(loadMeta, 60000);
 </script>
 </body>
 </html>
