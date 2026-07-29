@@ -15,7 +15,7 @@ const GOOGLE_SHEET_NAME = process.env.GOOGLE_SHEETS_TAB_NAME || 'Registrations';
 const GOOGLE_ENABLED = Boolean(GOOGLE_SPREADSHEET_ID && GOOGLE_CLIENT_EMAIL && GOOGLE_PRIVATE_KEY);
 
 const REG_HEADERS = [
-  'id', 'timestamp', 'fullName', 'phone', 'jerseyNumber', 'jerseySize',
+  'id', 'Ngày tạo', 'timestamp', 'fullName', 'phone', 'jerseyNumber', 'jerseySize',
   'position', 'health', 'height', 'weight', 'speed', 'stamina',
   'technique', 'tactic', 'physical', 'diet', 'transport', 'notes'
 ];
@@ -25,6 +25,7 @@ if (!fs.existsSync(PHOTOS_FILE)) fs.writeFileSync(PHOTOS_FILE, '[]');
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR);
 
 let googleTokenCache = { token: '', exp: 0 };
+let googleHeaderSynced = false;
 
 function getPathname(reqUrl) {
   try { return new URL(reqUrl, 'http://localhost').pathname; }
@@ -48,8 +49,10 @@ function writeJsonArray(filePath, data) {
 
 function normalizeRegistration(row, fallbackId) {
   const id = row.id ?? fallbackId;
+  const createdAt = row.createdAt || row.created_at || row.timestamp || '';
   return {
     id: Number.isFinite(Number(id)) ? Number(id) : String(id),
+    createdAt,
     timestamp: row.timestamp || '',
     fullName: row.fullName || row.full_name || '',
     phone: row.phone || '',
@@ -73,6 +76,7 @@ function normalizeRegistration(row, fallbackId) {
 function registrationToSheetRow(row) {
   return [
     String(row.id || ''),
+    row.createdAt || row.timestamp || '',
     row.timestamp || '',
     row.fullName || '',
     row.phone || '',
@@ -97,23 +101,24 @@ function sheetRowToRegistration(values, index) {
   const v = values || [];
   return normalizeRegistration({
     id: v[0] || Date.now() + index,
-    timestamp: v[1] || '',
-    fullName: v[2] || '',
-    phone: v[3] || '',
-    jerseyNumber: v[4] || '',
-    jerseySize: v[5] || '',
-    position: v[6] || '',
-    health: v[7] || '',
-    height: v[8] || '',
-    weight: v[9] || '',
-    speed: v[10] || '',
-    stamina: v[11] || '',
-    technique: v[12] || '',
-    tactic: v[13] || '',
-    physical: v[14] || '',
-    diet: v[15] || '',
-    transport: v[16] || '',
-    notes: v[17] || ''
+    createdAt: v[1] || v[2] || '',
+    timestamp: v[2] || '',
+    fullName: v[3] || '',
+    phone: v[4] || '',
+    jerseyNumber: v[5] || '',
+    jerseySize: v[6] || '',
+    position: v[7] || '',
+    health: v[8] || '',
+    height: v[9] || '',
+    weight: v[10] || '',
+    speed: v[11] || '',
+    stamina: v[12] || '',
+    technique: v[13] || '',
+    tactic: v[14] || '',
+    physical: v[15] || '',
+    diet: v[16] || '',
+    transport: v[17] || '',
+    notes: v[18] || ''
   }, v[0] || Date.now() + index);
 }
 
@@ -225,7 +230,7 @@ async function googleSheetsRequest(method, endpoint, body) {
 }
 
 async function fetchGoogleRegistrations() {
-  const range = encodeURIComponent(`${GOOGLE_SHEET_NAME}!A1:R`);
+  const range = encodeURIComponent(`${GOOGLE_SHEET_NAME}!A1:S`);
   const data = await googleSheetsRequest('GET', `/v4/spreadsheets/${GOOGLE_SPREADSHEET_ID}/values/${range}`);
   const values = Array.isArray(data.values) ? data.values : [];
   if (values.length <= 1) return [];
@@ -243,8 +248,19 @@ async function replaceGoogleRegistrations(rows) {
 }
 
 async function clearGoogleRegistrations() {
-  const range = encodeURIComponent(`${GOOGLE_SHEET_NAME}!A:R`);
+  const range = encodeURIComponent(`${GOOGLE_SHEET_NAME}!A:S`);
   await googleSheetsRequest('POST', `/v4/spreadsheets/${GOOGLE_SPREADSHEET_ID}/values/${range}:clear`, {});
+}
+
+async function ensureGoogleHeaderRow() {
+  if (googleHeaderSynced) return;
+  const range = encodeURIComponent(`${GOOGLE_SHEET_NAME}!A1`);
+  await googleSheetsRequest(
+    'PUT',
+    `/v4/spreadsheets/${GOOGLE_SPREADSHEET_ID}/values/${range}?valueInputOption=RAW`,
+    { range: `${GOOGLE_SHEET_NAME}!A1`, majorDimension: 'ROWS', values: [REG_HEADERS] }
+  );
+  googleHeaderSynced = true;
 }
 
 async function resolveRegistrations() {
@@ -252,6 +268,7 @@ async function resolveRegistrations() {
   if (!GOOGLE_ENABLED) return local;
 
   try {
+    await ensureGoogleHeaderRow();
     const sheetRows = await fetchGoogleRegistrations();
     if (sheetRows.length) {
       writeRegistrationsLocal(sheetRows);
@@ -380,6 +397,7 @@ const server = http.createServer((req, res) => {
         const d = JSON.parse(body || '{}');
         const row = normalizeRegistration({
           id: Date.now(),
+          createdAt: new Date().toLocaleString('vi-VN'),
           timestamp: new Date().toLocaleString('vi-VN'),
           fullName: d.fullName || '',
           phone: d.phone || '',
@@ -483,10 +501,10 @@ const server = http.createServer((req, res) => {
   if (pathname === '/api/export/csv') {
     (async () => {
       const rows = await resolveRegistrations();
-      const h = ['STT', 'Ho Ten', 'SDT', 'So Ao', 'Size', 'Vi Tri', 'Suc Khoe', 'Cao', 'Nang', 'Toc Do', 'Suc Ben', 'Ky Thuat', 'Chien Thuat', 'The Luc', 'Che Do An', 'Phuong Tien', 'Ghi Chu', 'Thoi Gian'];
+      const h = ['STT', 'Ho Ten', 'SDT', 'So Ao', 'Size', 'Vi Tri', 'Suc Khoe', 'Cao', 'Nang', 'Toc Do', 'Suc Ben', 'Ky Thuat', 'Chien Thuat', 'The Luc', 'Che Do An', 'Phuong Tien', 'Ghi Chu', 'Ngay Tao', 'Thoi Gian'];
       const csvRows = rows.map((d, i) => [
         i + 1, d.fullName, d.phone, d.jerseyNumber, d.jerseySize, d.position, d.health, d.height, d.weight,
-        d.speed, d.stamina, d.technique, d.tactic, d.physical, d.diet, d.transport, d.notes, d.timestamp
+        d.speed, d.stamina, d.technique, d.tactic, d.physical, d.diet, d.transport, d.notes, d.createdAt || d.timestamp, d.timestamp
       ].map(v => `"${(v || '').toString().replace(/"/g, '""')}"`).join(','));
       const csv = '\uFEFF' + [h.join(','), ...csvRows].join('\r\n');
       res.writeHead(200, {
@@ -507,12 +525,12 @@ const server = http.createServer((req, res) => {
       const rows = await resolveRegistrations();
       const esc = v => (v || '').toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       const cell = v => `<Cell><Data ss:Type="String">${esc(v)}</Data></Cell>`;
-      const h = ['STT', 'Ho Ten', 'SDT', 'So Ao', 'Size', 'Vi Tri', 'Suc Khoe', 'Cao', 'Nang', 'Toc Do', 'Suc Ben', 'Ky Thuat', 'Chien Thuat', 'The Luc', 'Che Do An', 'Phuong Tien', 'Ghi Chu', 'Thoi Gian'];
+      const h = ['STT', 'Ho Ten', 'SDT', 'So Ao', 'Size', 'Vi Tri', 'Suc Khoe', 'Cao', 'Nang', 'Toc Do', 'Suc Ben', 'Ky Thuat', 'Chien Thuat', 'The Luc', 'Che Do An', 'Phuong Tien', 'Ghi Chu', 'Ngay Tao', 'Thoi Gian'];
       let xmlRows = `<Row>${h.map(cell).join('')}</Row>`;
       rows.forEach((d, i) => {
         xmlRows += `<Row>${[
           i + 1, d.fullName, d.phone, d.jerseyNumber, d.jerseySize, d.position, d.health, d.height, d.weight,
-          d.speed, d.stamina, d.technique, d.tactic, d.physical, d.diet, d.transport, d.notes, d.timestamp
+          d.speed, d.stamina, d.technique, d.tactic, d.physical, d.diet, d.transport, d.notes, d.createdAt || d.timestamp, d.timestamp
         ].map(cell).join('')}</Row>`;
       });
       const xlsx = `<?xml version="1.0"?><?mso-application progid="Excel.Sheet"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="DanhSach"><Table>${xmlRows}</Table></Worksheet></Workbook>`;

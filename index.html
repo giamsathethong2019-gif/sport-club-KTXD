@@ -439,11 +439,11 @@ async function loadMeta(){
     const pill=document.getElementById('sourcePill');
     if(meta.googleSheets){
       text.textContent=`Nguồn chính: Google Sheets · Tab ${meta.sheetName||'Registrations'}`;
-      pill.textContent='Đang đồng bộ';
+      pill.textContent='Đã đồng bộ';
       pill.className='source-pill ok';
     }else{
       text.textContent='Nguồn chính chưa cấu hình Google Sheets, đang dùng cache local.';
-      pill.textContent='Local cache';
+      pill.textContent='Dùng cache';
       pill.className='source-pill warn';
     }
   }catch{

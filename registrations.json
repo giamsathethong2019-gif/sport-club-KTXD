@@ -130,5 +130,25 @@
     "notes": "",
     "id": 1784789120868,
     "timestamp": "13:45:20 23/7/2026"
+  },
+  {
+    "fullName": "Huỳnh Thanh Bùi",
+    "phone": "0586079961",
+    "jerseyNumber": "3",
+    "jerseySize": "L",
+    "position": "Hậu vệ",
+    "health": "Tốt",
+    "height": "",
+    "weight": "65",
+    "speed": "5",
+    "stamina": "5",
+    "technique": "5",
+    "tactic": "5",
+    "physical": "5",
+    "diet": "Bình thường",
+    "transport": "Xe máy",
+    "notes": "vui tính hòa đồng",
+    "id": 1785305510975,
+    "timestamp": "13:11:50 29/7/2026"
   }
 ]
