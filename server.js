@@ -11,7 +11,7 @@ const UPLOADS_DIR = path.join(__dirname, 'uploads');
 const GOOGLE_SPREADSHEET_ID = process.env.GOOGLE_SHEETS_SPREADSHEET_ID || '';
 const GOOGLE_CLIENT_EMAIL = process.env.GOOGLE_SHEETS_CLIENT_EMAIL || '';
 const GOOGLE_PRIVATE_KEY = (process.env.GOOGLE_SHEETS_PRIVATE_KEY || '').replace(/\\n/g, '\n');
-const GOOGLE_SHEET_NAME = process.env.GOOGLE_SHEETS_TAB_NAME || 'Registrations';
+const GOOGLE_SHEET_NAME = process.env.GOOGLE_SHEETS_TAB_NAME || 'Trang tính1';
 const GOOGLE_ENABLED = Boolean(GOOGLE_SPREADSHEET_ID && GOOGLE_CLIENT_EMAIL && GOOGLE_PRIVATE_KEY);
 
 const REG_HEADERS = [
