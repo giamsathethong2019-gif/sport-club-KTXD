@@ -238,9 +238,9 @@ tr:hover td{background:rgba(255,255,255,.03)}
       <div class="tbl-wrap">
         <table>
           <thead>
-            <tr><th>#</th><th>Họ Tên</th><th>SĐT</th><th>Số Áo</th><th>Size</th><th>Vị Trí</th><th>Sức Khỏe</th><th>Cao</th><th>Nặng</th><th>Thao Tác</th></tr>
+            <tr><th>#</th><th>Họ Tên</th><th>SĐT</th><th>Ngày tạo</th><th>Số Áo</th><th>Size</th><th>Vị Trí</th><th>Sức Khỏe</th><th>Cao</th><th>Nặng</th><th>Thao Tác</th></tr>
           </thead>
-          <tbody id="tableBody"><tr><td colspan="10" class="no-data">⏳ Đang tải...</td></tr></tbody>
+          <tbody id="tableBody"><tr><td colspan="11" class="no-data">⏳ Đang tải...</td></tr></tbody>
         </table>
       </div>
       <div style="margin-top:14px;text-align:right">
@@ -461,11 +461,12 @@ async function loadList(){
     const data=await fetchJson(API+'/api/registrations');
     const posC={'Thủ môn':'bo','Hậu vệ':'bb','Tiền vệ':'bg','Tiền đạo':'br','Linh hoạt':'bb','Chưa chọn':'bo'};
     const body=document.getElementById('tableBody');
-    if(!data.length){body.innerHTML='<tr><td colspan="10" class="no-data">Chưa có đăng ký nào</td></tr>';return;}
+    if(!data.length){body.innerHTML='<tr><td colspan="11" class="no-data">Chưa có đăng ký nào</td></tr>';return;}
     body.innerHTML=data.map((d,i)=>`<tr>
       <td><b>${i+1}</b></td>
       <td><b>${d.fullName||'--'}</b></td>
       <td>${d.phone||'--'}</td>
+      <td>${d.createdAt||d.timestamp||'--'}</td>
       <td><span class="badge bo" style="font-weight:900">#${d.jerseyNumber||'--'}</span></td>
       <td><span class="badge bb">${d.jerseySize||'--'}</span></td>
       <td><span class="badge ${posC[d.position]||'bb'}">${d.position||'--'}</span></td>
@@ -474,7 +475,7 @@ async function loadList(){
       <td>${d.weight?d.weight+'kg':'--'}</td>
       <td><button class="btn btn-red" style="padding:5px 10px;font-size:.75em" onclick="deleteReg(${d.id})">🗑️</button></td>
     </tr>`).join('');
-  }catch{document.getElementById('tableBody').innerHTML='<tr><td colspan="10" class="no-data">❌ Lỗi kết nối</td></tr>';}
+  }catch{document.getElementById('tableBody').innerHTML='<tr><td colspan="11" class="no-data">❌ Lỗi kết nối</td></tr>';}
 }
 
 async function deleteReg(id){
@@ -495,8 +496,8 @@ async function loadPreview(){
     const el=document.getElementById('previewTable');
     if(!data.length){el.innerHTML='<div class="no-data">Chưa có dữ liệu</div>';return;}
     el.innerHTML=`<div class="tbl-wrap"><table>
-      <thead><tr><th>#</th><th>Họ Tên</th><th>SĐT</th><th>Số Áo</th><th>Size</th><th>Vị Trí</th><th>Cao</th><th>Nặng</th><th>Tốc Độ</th><th>Sức Bền</th><th>Kỹ Thuật</th></tr></thead>
-      <tbody>${data.map((d,i)=>`<tr><td>${i+1}</td><td><b>${d.fullName}</b></td><td>${d.phone}</td><td>#${d.jerseyNumber}</td><td>${d.jerseySize}</td><td>${d.position}</td><td>${d.height||'--'}</td><td>${d.weight||'--'}</td><td>${d.speed||'--'}/10</td><td>${d.stamina||'--'}/10</td><td>${d.technique||'--'}/10</td></tr>`).join('')}
+      <thead><tr><th>#</th><th>Họ Tên</th><th>SĐT</th><th>Ngày tạo</th><th>Số Áo</th><th>Size</th><th>Vị Trí</th><th>Cao</th><th>Nặng</th><th>Tốc Độ</th><th>Sức Bền</th><th>Kỹ Thuật</th></tr></thead>
+      <tbody>${data.map((d,i)=>`<tr><td>${i+1}</td><td><b>${d.fullName}</b></td><td>${d.phone}</td><td>${d.createdAt||d.timestamp||'--'}</td><td>#${d.jerseyNumber}</td><td>${d.jerseySize}</td><td>${d.position}</td><td>${d.height||'--'}</td><td>${d.weight||'--'}</td><td>${d.speed||'--'}/10</td><td>${d.stamina||'--'}/10</td><td>${d.technique||'--'}/10</td></tr>`).join('')}
       </tbody></table></div><div style="margin-top:10px;color:rgba(255,255,255,.4);font-size:.8em">Tổng: ${data.length} cầu thủ</div>`;
   }catch{}
 }
