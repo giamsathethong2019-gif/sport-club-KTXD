@@ -154,10 +154,16 @@ function httpsJsonRequest(hostname, pathName, method, body, headers = {}) {
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
         const isJson = (res.headers['content-type'] || '').includes('application/json');
-        if (!data) return resolve({});
-        if (!isJson) return resolve(data);
-        try { resolve(JSON.parse(data)); }
-        catch { resolve({}); }
+        const statusCode = res.statusCode || 0;
+        const payload = !data ? {} : (isJson ? (() => {
+          try { return JSON.parse(data); }
+          catch { return {}; }
+        })() : data);
+        if (statusCode >= 400) {
+          const detail = typeof payload === 'string' ? payload : JSON.stringify(payload);
+          return reject(new Error(`HTTP ${statusCode} ${method} ${hostname}${pathName}: ${detail}`));
+        }
+        resolve(payload);
       });
     });
     req.on('error', reject);
@@ -275,8 +281,10 @@ async function resolveRegistrations() {
       return sheetRows;
     }
     if (local.length) {
+      // Migrate old local data into Google Sheets once, then keep both in sync.
       await clearGoogleRegistrations();
       await replaceGoogleRegistrations(local);
+      writeRegistrationsLocal(local);
       return local;
     }
     return [];
@@ -289,6 +297,7 @@ async function resolveRegistrations() {
 async function persistRegistrations(rows) {
   writeRegistrationsLocal(rows);
   if (!GOOGLE_ENABLED) return;
+  await ensureGoogleHeaderRow();
   await clearGoogleRegistrations();
   await replaceGoogleRegistrations(rows);
 }
