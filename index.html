@@ -55,6 +55,10 @@ input[type=range]{padding:4px 0;cursor:pointer;accent-color:var(--gold)}
 .source-pill{padding:5px 10px;border-radius:999px;font-weight:800;letter-spacing:.3px;font-size:.78em;text-transform:uppercase}
 .source-pill.ok{background:rgba(46,213,115,.16);color:var(--green);border:1px solid rgba(46,213,115,.28)}
 .source-pill.warn{background:rgba(255,165,0,.14);color:#ffa500;border:1px solid rgba(255,165,0,.28)}
+.theme-tools{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:-4px 0 18px;padding:12px 14px;border-radius:12px;border:1px dashed rgba(255,215,0,.28);background:rgba(255,215,0,.06)}
+.theme-tools .theme-note{font-size:.82em;color:rgba(255,255,255,.72);line-height:1.45}
+.theme-actions{display:flex;gap:8px;flex-wrap:wrap}
+.theme-actions .btn{padding:10px 14px;font-size:.82em}
 
 /* BUTTONS */
 .btn{padding:13px 22px;border:none;border-radius:10px;font-weight:700;cursor:pointer;transition:all .3s;font-size:.9em;letter-spacing:.5px}
@@ -64,6 +68,7 @@ input[type=range]{padding:4px 0;cursor:pointer;accent-color:var(--gold)}
 .btn-outline:hover{background:rgba(255,255,255,.1)}
 .btn-green{background:rgba(46,213,115,.15);border:1px solid rgba(46,213,115,.3);color:var(--green)}
 .btn-red{background:rgba(255,71,87,.15);border:1px solid rgba(255,71,87,.3);color:var(--red)}
+.btn-edit{background:rgba(100,149,237,.15);border:1px solid rgba(100,149,237,.35);color:#8ec5ff}
 .btn-submit{width:100%;padding:15px;margin-top:20px;font-size:1em;text-transform:uppercase}
 
 /* TABLE */
@@ -120,6 +125,16 @@ tr:hover td{background:rgba(255,255,255,.03)}
 .toast.success{background:linear-gradient(135deg,#2ed573,#1abc9c);color:#fff}
 .toast.error{background:linear-gradient(135deg,#ff4757,#c0392b);color:#fff}
 
+/* EDIT MODAL */
+.modal-overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:18px;background:rgba(2,8,20,.78);backdrop-filter:blur(8px);z-index:9998}
+.modal-overlay.open{display:flex}
+.modal-panel{width:min(940px,100%);max-height:92vh;overflow:auto;background:linear-gradient(180deg,#08162b,#06101f);border:1px solid rgba(255,255,255,.12);border-radius:20px;box-shadow:0 30px 80px rgba(0,0,0,.6);padding:22px}
+.modal-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:16px}
+.modal-head h3{font-size:1.2em;color:var(--gold);margin-bottom:4px}
+.modal-head p{font-size:.85em;color:rgba(255,255,255,.55)}
+.modal-close{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:#fff;border-radius:10px;padding:8px 12px;cursor:pointer}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap}
+
 .tab-content{display:none}
 .tab-content.active{display:block}
 
@@ -146,6 +161,17 @@ tr:hover td{background:rgba(255,255,255,.03)}
       </div>
     </div>
     <div class="hero-live">🔴 LIVE</div>
+  </div>
+
+  <div class="theme-tools">
+    <div class="theme-note">
+      <strong>Tùy chỉnh giao diện:</strong> đổi ảnh nền trang và ảnh bìa đội bóng bằng file ảnh trên máy bạn.
+    </div>
+    <div class="theme-actions">
+      <button class="btn btn-outline" id="btnChangeBg" type="button">Đổi nền trang</button>
+      <button class="btn btn-outline" id="btnChangeCover" type="button">Đổi ảnh bìa</button>
+      <button class="btn btn-outline" id="btnResetTheme" type="button">Khôi phục mặc định</button>
+    </div>
   </div>
 
   <!-- STATS -->
@@ -238,7 +264,7 @@ tr:hover td{background:rgba(255,255,255,.03)}
       <div class="tbl-wrap">
         <table>
           <thead>
-            <tr><th>#</th><th>Họ Tên</th><th>SĐT</th><th>Ngày tạo</th><th>Số Áo</th><th>Size</th><th>Vị Trí</th><th>Sức Khỏe</th><th>Cao</th><th>Nặng</th><th>Thao Tác</th></tr>
+            <tr><th>#</th><th>Họ Tên</th><th>SĐT</th><th>Ngày tạo</th><th>Số Áo</th><th>Size</th><th>Vị Trí</th><th>Sức Khỏe</th><th>Cao</th><th>Nặng</th><th>Chỉnh sửa</th></tr>
           </thead>
           <tbody id="tableBody"><tr><td colspan="11" class="no-data">⏳ Đang tải...</td></tr></tbody>
         </table>
@@ -344,10 +370,70 @@ tr:hover td{background:rgba(255,255,255,.03)}
 </div><!-- /wrap -->
 
 <div class="toast" id="toast"></div>
+<div class="modal-overlay" id="editModal" onclick="if(event.target===this) closeEditModal()">
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="editModalTitle" onclick="event.stopPropagation()">
+    <div class="modal-head">
+      <div>
+        <h3 id="editModalTitle">✏️ Chỉnh Sửa Cầu Thủ</h3>
+        <p>Cập nhật lại thông tin thiếu hoặc nhập sai rồi lưu thẳng lên Google Sheets.</p>
+      </div>
+      <button class="modal-close" type="button" onclick="closeEditModal()">Đóng</button>
+    </div>
+    <form id="editForm">
+      <div class="form-grid">
+        <div class="fg"><label>👤 Họ và Tên *</label><input type="text" id="editFullName" required/></div>
+        <div class="fg"><label>📞 Số Điện Thoại *</label><input type="tel" id="editPhone" required/></div>
+        <div class="fg"><label>🏷️ Số Áo *</label><input type="number" id="editJerseyNumber" min="1" max="99" required/></div>
+        <div class="fg"><label>📏 Size Áo *</label>
+          <select id="editJerseySize" required>
+            <option value="">-- Chọn size --</option>
+            <option>XS</option><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option><option>XXXL</option>
+          </select>
+        </div>
+        <div class="fg"><label>⚽ Vị Trí</label>
+          <select id="editPosition">
+            <option value="">-- Chọn vị trí --</option>
+            <option>Thủ môn</option><option>Hậu vệ</option><option>Tiền vệ</option><option>Tiền đạo</option><option>Linh hoạt</option>
+          </select>
+        </div>
+        <div class="fg"><label>🏥 Sức Khỏe</label>
+          <select id="editHealth">
+            <option>Tốt</option><option>Bình thường</option><option>Có chấn thương nhẹ</option>
+          </select>
+        </div>
+        <div class="fg"><label>📐 Chiều Cao (cm)</label><input type="number" id="editHeight" min="140" max="210"/></div>
+        <div class="fg"><label>⚖️ Cân Nặng (kg)</label><input type="number" id="editWeight" min="40" max="120"/></div>
+        <div class="fg full"><label>⚡ Tốc Độ (1–10) <span id="editVSpeed">5</span>/10</label><input type="range" id="editSpeed" min="1" max="10" value="5" oninput="document.getElementById('editVSpeed').textContent=this.value"/></div>
+        <div class="fg full"><label>🫀 Sức Bền (1–10) <span id="editVStamina">5</span>/10</label><input type="range" id="editStamina" min="1" max="10" value="5" oninput="document.getElementById('editVStamina').textContent=this.value"/></div>
+        <div class="fg full"><label>🎯 Kỹ Thuật (1–10) <span id="editVTechnique">5</span>/10</label><input type="range" id="editTechnique" min="1" max="10" value="5" oninput="document.getElementById('editVTechnique').textContent=this.value"/></div>
+        <div class="fg full"><label>🧠 Chiến Thuật (1–10) <span id="editVTactic">5</span>/10</label><input type="range" id="editTactic" min="1" max="10" value="5" oninput="document.getElementById('editVTactic').textContent=this.value"/></div>
+        <div class="fg full"><label>💪 Thể Lực (1–10) <span id="editVPhysical">5</span>/10</label><input type="range" id="editPhysical" min="1" max="10" value="5" oninput="document.getElementById('editVPhysical').textContent=this.value"/></div>
+        <div class="fg"><label>🍽️ Chế Độ Ăn</label>
+          <select id="editDiet">
+            <option>Bình thường</option><option>Ăn chay</option><option>Không ăn hải sản</option><option>Khác</option>
+          </select>
+        </div>
+        <div class="fg"><label>🚗 Phương Tiện</label>
+          <select id="editTransport">
+            <option>Xe máy</option><option>Ô tô</option><option>Cần đưa đón</option>
+          </select>
+        </div>
+        <div class="fg full"><label>📝 Ghi Chú</label><textarea id="editNotes" rows="2" placeholder="Thông tin thêm..."></textarea></div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-outline" onclick="closeEditModal()">Hủy</button>
+        <button type="submit" class="btn btn-gold">💾 Lưu Thay Đổi</button>
+      </div>
+    </form>
+  </div>
+</div>
 
 <script>
 const API = window.location.origin;
-let allPhotos = [], currentQuarter = 'ALL';
+let allPhotos = [], currentQuarter = 'ALL', registrationsCache = [], editingRegistrationId = null;
+const THEME_BG_KEY = 'sportclub-theme.pageBackground';
+const THEME_COVER_KEY = 'sportclub-theme.teamCover';
+const DEFAULT_HERO_SRC = document.querySelector('.hero img')?.src || '';
 
 async function fetchJson(url){
   const res = await fetch(url, { cache: 'no-store' });
@@ -383,6 +469,162 @@ function toast(msg,type='success'){
   setTimeout(()=>t.classList.add('show'),10);
   setTimeout(()=>t.classList.remove('show'),3500);
 }
+
+function fileToDataUrl(file){
+  return new Promise((resolve,reject)=>{
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error('Không đọc được file ảnh'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function applySavedTheme(){
+  const bg = localStorage.getItem(THEME_BG_KEY);
+  const cover = localStorage.getItem(THEME_COVER_KEY);
+  const heroImg = document.querySelector('.hero img');
+  if(bg){
+    document.body.style.backgroundImage = `linear-gradient(rgba(5,13,26,.92), rgba(10,31,61,.88), rgba(13,43,78,.92)), url("${bg}")`;
+    document.body.style.backgroundSize = 'cover';
+    document.body.style.backgroundPosition = 'center';
+    document.body.style.backgroundAttachment = 'fixed';
+    document.body.style.backgroundRepeat = 'no-repeat';
+  }else{
+    document.body.style.backgroundImage = '';
+    document.body.style.backgroundSize = '';
+    document.body.style.backgroundPosition = '';
+    document.body.style.backgroundAttachment = '';
+    document.body.style.backgroundRepeat = '';
+  }
+  if(heroImg){
+    heroImg.src = cover || DEFAULT_HERO_SRC;
+  }
+}
+
+async function pickAndStoreTheme(kind){
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.onchange = async () => {
+    const file = input.files && input.files[0];
+    if(!file) return;
+    try{
+      const dataUrl = await fileToDataUrl(file);
+      if(kind === 'bg'){
+        localStorage.setItem(THEME_BG_KEY, dataUrl);
+        applySavedTheme();
+        toast('✅ Đã đổi nền trang');
+      }else{
+        localStorage.setItem(THEME_COVER_KEY, dataUrl);
+        applySavedTheme();
+        toast('✅ Đã đổi ảnh bìa đội bóng');
+      }
+    }catch(err){
+      console.error(err);
+      toast('❌ Không thể đọc ảnh', 'error');
+    }
+  };
+  input.click();
+}
+
+function resetTheme(){
+  localStorage.removeItem(THEME_BG_KEY);
+  localStorage.removeItem(THEME_COVER_KEY);
+  applySavedTheme();
+  toast('✅ Đã khôi phục giao diện mặc định');
+}
+
+function wireThemeControls(){
+  const bgBtn = document.getElementById('btnChangeBg');
+  const coverBtn = document.getElementById('btnChangeCover');
+  const resetBtn = document.getElementById('btnResetTheme');
+  bgBtn && bgBtn.addEventListener('click', () => pickAndStoreTheme('bg'));
+  coverBtn && coverBtn.addEventListener('click', () => pickAndStoreTheme('cover'));
+  resetBtn && resetBtn.addEventListener('click', resetTheme);
+  applySavedTheme();
+}
+
+function setEditRangeValues(){
+  document.getElementById('editVSpeed').textContent=document.getElementById('editSpeed').value;
+  document.getElementById('editVStamina').textContent=document.getElementById('editStamina').value;
+  document.getElementById('editVTechnique').textContent=document.getElementById('editTechnique').value;
+  document.getElementById('editVTactic').textContent=document.getElementById('editTactic').value;
+  document.getElementById('editVPhysical').textContent=document.getElementById('editPhysical').value;
+}
+
+function openEditModal(id){
+  const row=registrationsCache.find(d=>String(d.id)===String(id));
+  if(!row){toast('❌ Không tìm thấy cầu thủ để sửa','error');return;}
+  editingRegistrationId=row.id;
+  document.getElementById('editFullName').value=row.fullName||'';
+  document.getElementById('editPhone').value=row.phone||'';
+  document.getElementById('editJerseyNumber').value=row.jerseyNumber||'';
+  document.getElementById('editJerseySize').value=row.jerseySize||'';
+  document.getElementById('editPosition').value=row.position||'';
+  document.getElementById('editHealth').value=row.health||'Tốt';
+  document.getElementById('editHeight').value=row.height||'';
+  document.getElementById('editWeight').value=row.weight||'';
+  document.getElementById('editSpeed').value=row.speed||5;
+  document.getElementById('editStamina').value=row.stamina||5;
+  document.getElementById('editTechnique').value=row.technique||5;
+  document.getElementById('editTactic').value=row.tactic||5;
+  document.getElementById('editPhysical').value=row.physical||5;
+  document.getElementById('editDiet').value=row.diet||'Bình thường';
+  document.getElementById('editTransport').value=row.transport||'Xe máy';
+  document.getElementById('editNotes').value=row.notes||'';
+  setEditRangeValues();
+  document.getElementById('editModal').classList.add('open');
+}
+
+function closeEditModal(){
+  editingRegistrationId=null;
+  document.getElementById('editModal').classList.remove('open');
+}
+
+document.getElementById('editForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  if(!editingRegistrationId){toast('❌ Không có bản ghi để sửa','error');return;}
+  const btn=e.target.querySelector('button[type="submit"]');
+  btn.disabled=true; btn.textContent='⏳ Đang lưu...';
+  const payload={
+    fullName:document.getElementById('editFullName').value.trim(),
+    phone:document.getElementById('editPhone').value.trim(),
+    jerseyNumber:document.getElementById('editJerseyNumber').value,
+    jerseySize:document.getElementById('editJerseySize').value,
+    position:document.getElementById('editPosition').value||'Chưa chọn',
+    health:document.getElementById('editHealth').value,
+    height:document.getElementById('editHeight').value,
+    weight:document.getElementById('editWeight').value,
+    speed:document.getElementById('editSpeed').value,
+    stamina:document.getElementById('editStamina').value,
+    technique:document.getElementById('editTechnique').value,
+    tactic:document.getElementById('editTactic').value,
+    physical:document.getElementById('editPhysical').value,
+    diet:document.getElementById('editDiet').value,
+    transport:document.getElementById('editTransport').value,
+    notes:document.getElementById('editNotes').value.trim()
+  };
+  try{
+    const res=await fetch(API+'/api/registrations/'+editingRegistrationId,{
+      method:'PUT',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(payload)
+    });
+    const r=await res.json();
+    if(r.success){
+      toast('✅ Đã cập nhật thông tin');
+      closeEditModal();
+      loadList();
+      loadStats();
+      if(document.getElementById('tab-export').classList.contains('active')) loadPreview();
+    }else{
+      toast('❌ Lỗi: '+(r.message||'Không lưu được'),'error');
+    }
+  }catch{
+    toast('❌ Lỗi kết nối','error');
+  }
+  btn.disabled=false; btn.textContent='💾 Lưu Thay Đổi';
+});
 
 // ---- REGISTER ----
 document.getElementById('regForm').addEventListener('submit',async e=>{
@@ -459,6 +701,7 @@ async function loadMeta(){
 async function loadList(){
   try{
     const data=await fetchJson(API+'/api/registrations');
+    registrationsCache=data;
     const posC={'Thủ môn':'bo','Hậu vệ':'bb','Tiền vệ':'bg','Tiền đạo':'br','Linh hoạt':'bb','Chưa chọn':'bo'};
     const body=document.getElementById('tableBody');
     if(!data.length){body.innerHTML='<tr><td colspan="11" class="no-data">Chưa có đăng ký nào</td></tr>';return;}
@@ -473,15 +716,11 @@ async function loadList(){
       <td><span class="badge bg">${d.health||'--'}</span></td>
       <td>${d.height?d.height+'cm':'--'}</td>
       <td>${d.weight?d.weight+'kg':'--'}</td>
-      <td><button class="btn btn-red" style="padding:5px 10px;font-size:.75em" onclick="deleteReg(${d.id})">🗑️</button></td>
+      <td>
+        <button class="btn btn-edit" style="padding:5px 10px;font-size:.75em" onclick='openEditModal(${JSON.stringify(String(d.id))})'>✏️ Sửa</button>
+      </td>
     </tr>`).join('');
   }catch{document.getElementById('tableBody').innerHTML='<tr><td colspan="11" class="no-data">❌ Lỗi kết nối</td></tr>';}
-}
-
-async function deleteReg(id){
-  if(!confirm('Xóa đăng ký này?')) return;
-  await fetch(API+'/api/registrations/'+id,{method:'DELETE'});
-  toast('🗑️ Đã xóa'); loadList(); loadStats();
 }
 
 // ---- EXPORT ----
@@ -705,6 +944,7 @@ function showTeamOverview(data){
 }
 
 // INIT
+wireThemeControls();
 loadStats();
 loadMeta();
 setInterval(loadStats, 30000);
